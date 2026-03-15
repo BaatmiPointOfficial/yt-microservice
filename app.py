@@ -7,7 +7,6 @@ import boto3
 
 app = FastAPI()
 
-# 🛡️ THE VIP PASS: This allows your Vercel website to talk to Render
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -16,7 +15,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cloudflare R2 Setup (We will add your keys inside Render later!)
 s3 = boto3.client(
     's3',
     endpoint_url=os.getenv('R2_ENDPOINT'),
@@ -31,25 +29,28 @@ def read_root():
 
 @app.post("/api/youtube-downloader")
 async def process_youtube(url: str = Form(...), quality: str = Form("720p")):
-    print(f"📥 Downloading YouTube video: {url} at {quality}...")
-    
-    safe_filename = yt_down.download_youtube_video(video_url=url, output_folder="downloads", quality=quality)
-    
-    if not safe_filename:
-        return JSONResponse(status_code=500, content={"error": "Failed to download video"})
-        
-    file_path = os.path.join("downloads", safe_filename)
+    print(f"📥 Received request for YouTube video: {url}")
     
     try:
+        # 1. Download the video
+        safe_filename = yt_down.download_youtube_video(video_url=url, output_folder="downloads", quality=quality)
+        
+        if not safe_filename:
+            print("🚨 yt_down returned None! The download failed.")
+            return JSONResponse(status_code=500, content={"error": "Failed to download video"})
+            
+        file_path = os.path.join("downloads", safe_filename)
+        
+        # 2. Upload to Cloudflare
         print(f"☁️ Uploading {safe_filename} to Cloudflare...")
         with open(file_path, 'rb') as video_file:
             s3.put_object(Bucket=bucket_name, Key=f'downloads/{safe_filename}', Body=video_file)
             
-        os.remove(file_path) # Delete local file to save space
+        os.remove(file_path) 
+        print("✅ Upload complete! Sending link to website.")
         
-        # Give React the exact URL path it needs
         return {"message": "Success!", "file_name": safe_filename, "url": f"/downloads/{safe_filename}"}
         
     except Exception as e:
-        print(f"Upload error: {e}")
-        return JSONResponse(status_code=500, content={"error": "Cloudflare upload failed. Check API Keys."})
+        print(f"🚨 MAJOR SERVER ERROR: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
