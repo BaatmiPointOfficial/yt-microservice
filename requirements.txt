@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+razorpay
+yt-dlp
+boto3
+firebase-admin
+pydantic
+python-dotenv
+python-multipart
+slowapi
+moviepy==1.0.3
+opencv-python-headless
