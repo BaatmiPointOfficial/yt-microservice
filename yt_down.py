@@ -32,7 +32,8 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             'no_warnings': True,
             'source_address': '0.0.0.0',
             # 👇 THIS IS THE VIP BADGE YOU JUST ADDED! 👇
-            'cookiefile': 'cookies.txt' 
+            'cookiefile': 'cookies.txt',
+            'extractor_args': {'youtube': {'player_client': ['android']}}, 
         }
         
         if is_audio:
