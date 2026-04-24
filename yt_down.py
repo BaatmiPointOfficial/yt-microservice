@@ -13,17 +13,17 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
         safe_filename = f"yt_{random_id}.{ext}"
         final_path = os.path.join(output_folder, safe_filename)
 
-        # Quality Mapping
+        # Quality Mapping (Bulletproof Version)
         if quality == "best":
-            format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+            format_str = 'bestvideo+bestaudio/best'
         elif quality == "720p":
-            format_str = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best'
+            format_str = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
         elif quality == "480p":
-            format_str = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best'
+            format_str = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best'
         elif quality == "audio":
             format_str = 'bestaudio/best'
         else:
-            format_str = 'best[ext=mp4]/best' 
+            format_str = 'best'
             
         ydl_opts = {
             'format': format_str, 
