@@ -30,7 +30,9 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             'outtmpl': final_path,  
             'quiet': False,
             'no_warnings': True,
-            'source_address': '0.0.0.0'  
+            'source_address': '0.0.0.0',
+            # 👇 THIS IS THE VIP BADGE YOU JUST ADDED! 👇
+            'cookiefile': 'cookies.txt' 
         }
         
         if is_audio:
