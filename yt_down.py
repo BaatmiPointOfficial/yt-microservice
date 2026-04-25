@@ -57,12 +57,23 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             thumbnails = data.get('thumbnails', [])
             thumbnail = thumbnails[-1]['url'] if thumbnails else ''
             
+            
             # Download the MP4 directly to our server
-            print("🚀 Downloading MP4 from API...")
-            video_data = requests.get(direct_mp4_url).content
-            with open(final_path, 'wb') as handler:
-                handler.write(video_data)
-                
+            print("🚀 Downloading MP4 from API in chunks...")
+            
+            # 1. Put on a browser disguise so the video server doesn't block us
+            dl_headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
+            }
+            
+            # 2. Stream the download in tiny pieces to protect Render's RAM
+            with requests.get(direct_mp4_url, headers=dl_headers, stream=True) as r:
+                r.raise_for_status() # Check if the server actually gave us the video
+                with open(final_path, 'wb') as handler:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            handler.write(chunk)
+                            
             print("✅ API Download Complete!")
             return safe_filename, title, thumbnail
 
