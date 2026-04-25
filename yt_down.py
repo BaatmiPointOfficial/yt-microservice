@@ -5,9 +5,11 @@ import requests
 from urllib.parse import urlparse, parse_qs
 
 def extract_yt_id(url):
-    """Helper function to pull the video ID from the link"""
+    """Helper function to pull the video ID from normal links and Shorts"""
     parsed = urlparse(url)
     if "youtube.com" in parsed.netloc:
+        if "/shorts/" in parsed.path:
+            return parsed.path.split("/shorts/")[1].split("?")[0]
         return parse_qs(parsed.query).get("v", [None])[0]
     elif "youtu.be" in parsed.netloc:
         return parsed.path[1:]
@@ -23,58 +25,64 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
         final_path = os.path.join(output_folder, safe_filename)
 
         # ---------------------------------------------------------
-        # 🌟 THE HYBRID ROUTER: YOUTUBE -> RAPID API
+        # 🌟 YOUTUBE -> THE GOLDEN PROXY API
         # ---------------------------------------------------------
         if "youtube.com" in video_url or "youtu.be" in video_url:
-            print("🔗 YouTube link detected! Routing to Free RapidAPI...")
-            video_id = extract_yt_id(video_url)
+            print("🔗 YouTube link detected! Routing to Golden Proxy API...")
             
-            # The correct Video Download Endpoint
-            api_url = "https://youtube-media-downloader.p.rapidapi.com/v2/video/details"
-            querystring = {"videoId": video_id}
+            # NOTE: In RapidAPI, make sure you click the endpoint for "Video Details" or "Download"
+            # Update this URL if the dashboard gives you a slightly different one for videos!
+            api_url = "https://youtube-video-and-shorts-downloader1.p.rapidapi.com/api/v1/video" 
+            
+            # Extract the ID from the user's URL
+            video_id = extract_yt_id(video_url)
+            querystring = {"id": video_id} 
+            
             headers = {
-                "x-rapidapi-key": "03b30d167bmsh861ed6595bd1be2p1f639fjsnbcfcc274fa0a",
-                "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com"
+                "x-rapidapi-key": "03b30d167bmsh861ed6595bd1be2p1f639fjsnbcfcc274fa0a", # 👈 PASTE YOUR REAL KEY HERE
+                "x-rapidapi-host": "youtube-video-and-shorts-downloader1.p.rapidapi.com"
             }
             
+            # 1. Ask the Proxy API for the unlocked video link
             response = requests.get(api_url, headers=headers, params=querystring)
             data = response.json()
             
             direct_mp4_url = None
             
-            # Safely extract the MP4 link from the API's JSON response
-            if 'videos' in data and 'items' in data['videos']:
-                direct_mp4_url = data['videos']['items'][0]['url']
-            elif 'url' in data:
+            # Safely hunt for the MP4 link in their JSON data
+            if 'url' in data:
                 direct_mp4_url = data['url']
+            elif 'video' in data and 'url' in data['video']:
+                direct_mp4_url = data['video']['url']
+            elif 'links' in data:
+                direct_mp4_url = data['links'][0] # Grab highest quality
                 
             if not direct_mp4_url:
-                print(f"🚨 API Structure Error: {data}")
+                print(f"🚨 API Data Error (Check RapidAPI JSON structure): {data}")
                 return None, None, None
                 
-            # Grab Metadata
-            title = data.get('title', 'YouTube Video')
-            thumbnails = data.get('thumbnails', [])
-            thumbnail = thumbnails[-1]['url'] if thumbnails else ''
+            title = data.get('title', 'YouTube Media')
+            thumbnail = data.get('thumbnail', '')
+
+            # ---------------------------------------------------------
+            # 🛡️ THE FINAL PATCH: CHUNKED STREAMING + DISGUISE
+            # ---------------------------------------------------------
+            print("🚀 Downloading MP4 from Proxy API in chunks...")
             
-            
-            # Download the MP4 directly to our server
-            print("🚀 Downloading MP4 from API in chunks...")
-            
-            # 1. Put on a browser disguise so the video server doesn't block us
+            # Disguise our Render server as a normal Windows Chrome Browser
             dl_headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
             }
             
-            # 2. Stream the download in tiny pieces to protect Render's RAM
+            # Stream the file to protect Render's free RAM
             with requests.get(direct_mp4_url, headers=dl_headers, stream=True) as r:
-                r.raise_for_status() # Check if the server actually gave us the video
+                r.raise_for_status() 
                 with open(final_path, 'wb') as handler:
                     for chunk in r.iter_content(chunk_size=8192):
                         if chunk:
                             handler.write(chunk)
                             
-            print("✅ API Download Complete!")
+            print("✅ API Download & Save Complete!")
             return safe_filename, title, thumbnail
 
         # ---------------------------------------------------------
