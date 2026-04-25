@@ -32,11 +32,11 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             
             # NOTE: In RapidAPI, make sure you click the endpoint for "Video Details" or "Download"
             # Update this URL if the dashboard gives you a slightly different one for videos!
-            api_url = "https://youtube-video-and-shorts-downloader1.p.rapidapi.com/api/v1/video" 
+            url = "https://youtube-video-and-shorts-downloader1.p.rapidapi.com/youtube/v3/video/details"
             
             # Extract the ID from the user's URL
             video_id = extract_yt_id(video_url)
-            querystring = {"id": video_id} 
+            querystring = {"videoId": video_id} 
             
             headers = {
                 "x-rapidapi-key": "03b30d167bmsh861ed6595bd1be2p1f639fjsnbcfcc274fa0a", # 👈 PASTE YOUR REAL KEY HERE
