@@ -2,18 +2,6 @@ import yt_dlp
 import os
 import uuid
 import requests
-from urllib.parse import urlparse, parse_qs
-
-def extract_yt_id(url):
-    """Helper function to pull the video ID from standard links and Shorts"""
-    parsed = urlparse(url)
-    if "youtube.com" in parsed.netloc:
-        if "/shorts/" in parsed.path:
-            return parsed.path.split("/shorts/")[1].split("?")[0]
-        return parse_qs(parsed.query).get("v", [None])[0]
-    elif "youtu.be" in parsed.netloc:
-        return parsed.path[1:]
-    return None
 
 def download_youtube_video(video_url, output_folder="downloads", quality="720p"):
     try:
@@ -25,86 +13,63 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
         final_path = os.path.join(output_folder, safe_filename)
 
         # ---------------------------------------------------------
-        # 🌟 YOUTUBE -> THE GOLDEN PROXY API
+        # 🌟 YOUTUBE -> COBALT OPEN-SOURCE PROXY (100% FREE)
         # ---------------------------------------------------------
         if "youtube.com" in video_url or "youtu.be" in video_url:
-            print("🔗 YouTube link detected! Routing to Golden Proxy API...")
+            print("🔗 YouTube link detected! Routing to Cobalt Open-Source API...")
             
-            # The Exact API URL you provided
-            api_url = "https://youtube-video-and-shorts-downloader.p.rapidapi.com/download.php"
+            # The public Cobalt API endpoint
+            api_url = "https://api.cobalt.tools/api/json"
             
-            video_id = extract_yt_id(video_url)
-            if not video_id:
-                print("🚨 Could not extract YouTube ID from URL")
-                return None, None, None
-                
-            # The Exact Parameter you provided
-            querystring = {"id": video_id} 
-            
-            # The Exact Headers you provided
+            # Cobalt requires specific headers to know we aren't a malicious bot
             headers = {
-                "x-rapidapi-key": "03b30d167bmsh861ed6595bd1be2p1f639fjsnbcfcc274fa0a", # 🔴 PUT YOUR KEY HERE
-                "x-rapidapi-host": "youtube-video-and-shorts-downloader.p.rapidapi.com",
-                "Content-Type": "application/json"
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
             
-            # 1. Ask the Proxy API for the unlocked video link
-            response = requests.get(api_url, headers=headers, params=querystring)
+            # We tell Cobalt exactly what we want
+            payload = {
+                "url": video_url,
+                "vQuality": "720",          # Force 720p to save Render's memory
+                "isAudioOnly": is_audio     # Handle audio toggle
+            }
+            
+            # 1. Ask Cobalt to process the video and give us the proxied link
+            response = requests.post(api_url, json=payload, headers=headers)
             
             if response.status_code != 200:
-                print(f"🚨 API Request Failed! Status: {response.status_code}, Text: {response.text}")
+                print(f"🚨 Cobalt API Error! Status: {response.status_code}, Text: {response.text}")
                 return None, None, None
                 
             data = response.json()
             
-            # 2. Safely hunt for the MP4 link in their JSON data
-            direct_mp4_url = None
-            
-            # Look inside the 'results' list from this specific API
-            if 'results' in data and len(data['results']) > 0:
-                # Try to find a high-quality 720p video
-                for item in data['results']:
-                    if 'video' in item.get('mime', '') and item.get('quality') == '720p':
-                        direct_mp4_url = item.get('url')
-                        break
-                
-                # Fallback: If no 720p is found, grab the first available video
-                if not direct_mp4_url:
-                    for item in data['results']:
-                        if 'video' in item.get('mime', ''):
-                            direct_mp4_url = item.get('url')
-                            break
-
-            # Absolute fallback just in case
-            if not direct_mp4_url and 'url' in data:
-                direct_mp4_url = data['url']
-                
-            if not direct_mp4_url:
-                print(f"🚨 API Data Error (Could not find MP4 link): {data}")
+            # 2. Extract the clean download link
+            if data.get("status") in ["redirect", "stream", "success"]:
+                direct_mp4_url = data.get("url")
+            else:
+                print(f"🚨 Cobalt Data Error (Could not find proxied link): {data}")
                 return None, None, None
                 
-            title = data.get('title', 'YouTube Media')
-            thumbnail = data.get('thumbnail', '')
+            # Note: Cobalt doesn't return titles/thumbnails in the basic JSON, 
+            # so we set fallbacks to keep the frontend happy.
+            title = "YouTube Media Download" 
+            thumbnail = "" 
 
             # ---------------------------------------------------------
-            # 🛡️ THE FINAL PATCH: CHUNKED STREAMING + DISGUISE
+            # 🛡️ THE STREAMING PATCH (Protecting Render's Memory)
             # ---------------------------------------------------------
-            print("🚀 Downloading MP4 from Proxy API in chunks...")
+            print("🚀 Downloading MP4 from Cobalt Proxy in chunks...")
             
-            # Disguise our Render server as a normal Windows Chrome Browser
-            dl_headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
-            }
-            
-            # Stream the file to protect Render's free RAM
-            with requests.get(direct_mp4_url, headers=dl_headers, stream=True) as r:
+            # Stream the file from Cobalt's servers to our Render server
+            with requests.get(direct_mp4_url, headers=headers, stream=True) as r:
                 r.raise_for_status() 
                 with open(final_path, 'wb') as handler:
                     for chunk in r.iter_content(chunk_size=8192):
                         if chunk:
                             handler.write(chunk)
                             
-            print("✅ API Download & Save Complete!")
+            print("✅ Cobalt Download & Save Complete!")
             return safe_filename, title, thumbnail
 
         # ---------------------------------------------------------
