@@ -59,12 +59,25 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             
             # 2. Safely hunt for the MP4 link in their JSON data
             direct_mp4_url = None
-            if 'url' in data:
+            
+            # Look inside the 'results' list from this specific API
+            if 'results' in data and len(data['results']) > 0:
+                # Try to find a high-quality 720p video
+                for item in data['results']:
+                    if 'video' in item.get('mime', '') and item.get('quality') == '720p':
+                        direct_mp4_url = item.get('url')
+                        break
+                
+                # Fallback: If no 720p is found, grab the first available video
+                if not direct_mp4_url:
+                    for item in data['results']:
+                        if 'video' in item.get('mime', ''):
+                            direct_mp4_url = item.get('url')
+                            break
+
+            # Absolute fallback just in case
+            if not direct_mp4_url and 'url' in data:
                 direct_mp4_url = data['url']
-            elif 'link' in data:
-                direct_mp4_url = data['link']
-            elif 'video' in data and 'url' in data['video']:
-                direct_mp4_url = data['video']['url']
                 
             if not direct_mp4_url:
                 print(f"🚨 API Data Error (Could not find MP4 link): {data}")
