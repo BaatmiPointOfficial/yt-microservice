@@ -11,7 +11,7 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
         safe_filename = f"yt_{random_id}.{ext}"
         final_path = os.path.join(output_folder, safe_filename)
 
-        print("🔗 Link detected! Using pure native yt-dlp engine with Passport...")
+        print("🔗 Link detected! Firing armored yt-dlp engine...")
         
         if quality == "best":
             format_str = 'bestvideo+bestaudio/best'
@@ -29,8 +29,19 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             'outtmpl': final_path,  
             'quiet': False,
             'no_warnings': True,
-            # 🛡️ THE MAGIC BYPASS: Giving YouTube your Human Passport
-            'cookiefile': 'cookies.txt',  # Matches your exact file name!
+            'cookiefile': 'cookies.txt',  
+            
+            # 🛡️ THE ARMOR: Client Spoofing & Headers
+            'extractor_args': {
+                # Force YouTube to serve the standard web player, bypassing the Android VR bot-trap
+                'youtube': ['player_client=web,default'] 
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            # Add a tiny delay so we don't hammer Google's servers and trigger rate limits
+            'sleep_interval': 2, 
         }
         
         if is_audio:
