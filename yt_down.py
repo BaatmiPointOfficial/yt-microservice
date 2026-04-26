@@ -5,7 +5,6 @@ import requests
 from urllib.parse import urlparse, parse_qs
 
 def extract_yt_id(url):
-    """Helper function to pull the video ID from normal links and Shorts"""
     parsed = urlparse(url)
     if "youtube.com" in parsed.netloc:
         if "/shorts/" in parsed.path:
@@ -30,51 +29,43 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
         if "youtube.com" in video_url or "youtu.be" in video_url:
             print("🔗 YouTube link detected! Routing to Golden Proxy API...")
             
-            # NOTE: In RapidAPI, make sure you click the endpoint for "Video Details" or "Download"
-            # Update this URL if the dashboard gives you a slightly different one for videos!
-            url = "https://youtube-video-and-shorts-downloader1.p.rapidapi.com/youtube/v3/video/details"
+            # 🔴 PUT YOUR RAPID API URL EXACTLY HERE (Keep the quotes!):
+            api_url =  "https://youtube-video-and-shorts-downloader.p.rapidapi.com/download.php"
             
-            # Extract the ID from the user's URL
             video_id = extract_yt_id(video_url)
-            querystring = {"videoId": video_id} 
+            
+            # NOTE: If your API asks for "videoId" instead of "id", change it below!
+            querystring = {"id": video_id} 
             
             headers = {
-                "x-rapidapi-key": "03b30d167bmsh861ed6595bd1be2p1f639fjsnbcfcc274fa0a", # 👈 PASTE YOUR REAL KEY HERE
+                # 🔴 PUT YOUR RAPID API KEY EXACTLY HERE:
+                "x-rapidapi-key": "03b30d167bmsh861ed6595bd1be2p1f639fjsnbcfcc274fa0a",
                 "x-rapidapi-host": "youtube-video-and-shorts-downloader1.p.rapidapi.com"
             }
             
-            # 1. Ask the Proxy API for the unlocked video link
             response = requests.get(api_url, headers=headers, params=querystring)
             data = response.json()
             
             direct_mp4_url = None
-            
-            # Safely hunt for the MP4 link in their JSON data
             if 'url' in data:
                 direct_mp4_url = data['url']
             elif 'video' in data and 'url' in data['video']:
                 direct_mp4_url = data['video']['url']
             elif 'links' in data:
-                direct_mp4_url = data['links'][0] # Grab highest quality
+                direct_mp4_url = data['links'][0]
                 
             if not direct_mp4_url:
-                print(f"🚨 API Data Error (Check RapidAPI JSON structure): {data}")
+                print(f"🚨 API Data Error: {data}")
                 return None, None, None
                 
             title = data.get('title', 'YouTube Media')
             thumbnail = data.get('thumbnail', '')
 
-            # ---------------------------------------------------------
-            # 🛡️ THE FINAL PATCH: CHUNKED STREAMING + DISGUISE
-            # ---------------------------------------------------------
             print("🚀 Downloading MP4 from Proxy API in chunks...")
-            
-            # Disguise our Render server as a normal Windows Chrome Browser
             dl_headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
             }
             
-            # Stream the file to protect Render's free RAM
             with requests.get(direct_mp4_url, headers=dl_headers, stream=True) as r:
                 r.raise_for_status() 
                 with open(final_path, 'wb') as handler:
@@ -86,7 +77,7 @@ def download_youtube_video(video_url, output_folder="downloads", quality="720p")
             return safe_filename, title, thumbnail
 
         # ---------------------------------------------------------
-        # 🌟 INSTAGRAM / TWITTER -> NATIVE yt-dlp ENGINE
+        # 🌟 INSTAGRAM / TWITTER -> NATIVE ENGINE
         # ---------------------------------------------------------
         else:
             print("🔗 Non-YouTube link detected! Using native yt-dlp...")
