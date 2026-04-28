@@ -207,10 +207,7 @@ async def process_universal_download(
 @app.post("/api/batch-split")
 @limiter.limit("5/minute")
 async def process_batch_split(
-    request: Request,
-    video_file: UploadFile,
-    clip_duration: int = Form(60), # Default to 60-second clips
-    user_id: str = Form(...)
+    
 ):
   
     user_data = db.get_or_create_user(user_id)
@@ -259,6 +256,43 @@ async def process_batch_split(
         print(f"💸 Credit deducted! Remaining: {credits_left - 1}")
         
     return {"message": "Success!", "file_name": os.path.basename(zip_path)}
+
+@app.post("/api/trim-single")
+@limiter.limit("5/minute")
+async def process_single_clip(
+    request: Request,
+    video_file: UploadFile = File(...),
+    start_time: str = Form(...),   # 👈 Now Python catches the Start Time!
+    end_time: str = Form(...),     # 👈 Now Python catches the End Time!
+    text: str = Form(""),          # 👈 Catches the overlay text
+    user_id: str = Form(...)
+):
+    # 1. User Auth & Paywall (Copy your standard Firebase checks here)
+    user_data = db.get_or_create_user(user_id)
+    # ... your usual safety checks ...
+
+    # 2. Save the incoming video
+    input_video = f"downloads/temp_single_{video_file.filename}"
+    with open(input_video, "wb") as buffer:
+        buffer.write(await video_file.read())
+
+    print(f"✂️ Trimming single clip from {start_time} to {end_time}...")
+    
+    # 3. Call your trimming logic from trim_video.py!
+    # (Make sure you have a function in trim_video.py that takes start/end times)
+    output_filename = f"trimmed_{video_file.filename}"
+    output_path = f"downloads/{output_filename}"
+    
+    success = trim_video.cut_single_clip(input_video, start_time, end_time, text, output_path)
+
+    if not success:
+        return {"error": "Failed to trim the single clip."}
+
+    # 4. Clean up original file & deduct credit
+    import os
+    os.remove(input_video)
+
+    return {"message": "Success!", "file_name": output_filename}
 
 @app.get("/test-db")
 def test_database():
