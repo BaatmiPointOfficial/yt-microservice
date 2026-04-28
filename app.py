@@ -209,11 +209,10 @@ async def process_universal_download(
 async def process_batch_split(
     request: Request,
     video_file: UploadFile,
-    clip_duration: int = Form(60) # Default to 60-second clips
+    clip_duration: int = Form(60), # Default to 60-second clips
+    user_id: str = Form(...)
 ):
-   # 1. Grab the REAL user_id from the frontend (Replace hardcoded string later!)
-    user_id = "admin_user_1" # ⚠️ REMINDER: Connect this to your frontend soon!
-    
+  
     user_data = db.get_or_create_user(user_id)
 
     # 2. Safety Check: If Firebase returns NOTHING, stop gracefully!
