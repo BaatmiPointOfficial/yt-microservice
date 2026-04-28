@@ -290,7 +290,8 @@ async def process_single_clip(
 # We use the actual function name: trim_video
 # Note: We are ignoring the 'text' variable for now because your trim_video function 
 # doesn't accept a text parameter yet!
-    success = trim_video.trim_video(input_video, output_path, float(start_time), float(end_time))
+    success = trim_video.trim_video(input_video, output_path, start_time, end_time)
+
     if not success:
         return {"error": "Failed to trim the single clip."}
 
