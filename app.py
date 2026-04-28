@@ -207,6 +207,10 @@ async def process_universal_download(
 @app.post("/api/batch-split")
 @limiter.limit("5/minute")
 async def process_batch_split(
+    request: Request,
+    video_file: UploadFile = File(...),
+    clip_duration: int = Form(60),
+    user_id: str = Form(...)
     
 ):
   
