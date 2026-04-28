@@ -287,8 +287,10 @@ async def process_single_clip(
     output_filename = f"trimmed_{video_file.filename}"
     output_path = f"downloads/{output_filename}"
     
-    success = trim_video.cut_single_clip(input_video, start_time, end_time, text, output_path)
-
+# We use the actual function name: trim_video
+# Note: We are ignoring the 'text' variable for now because your trim_video function 
+# doesn't accept a text parameter yet!
+    success = trim_video.trim_video(input_video, output_path, float(start_time), float(end_time))
     if not success:
         return {"error": "Failed to trim the single clip."}
 
