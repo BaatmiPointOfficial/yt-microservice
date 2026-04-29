@@ -12,9 +12,13 @@ def download_youtube_video(video_url, quality="720p"):
     # 1. Ask Cobalt to do the hard work and bypass YouTube
     api_url = "https://api.cobalt.tools/api/json"
     
+    # 🛡️ THE DISGUISE: Tricking Cobalt into thinking we are a Chrome browser
     headers = {
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Origin": "https://cobalt.tools",
+        "Referer": "https://cobalt.tools/"
     }
     
     # Tell Cobalt exactly what we want
