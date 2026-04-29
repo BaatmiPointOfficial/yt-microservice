@@ -11,8 +11,8 @@ def download_youtube_video(video_url, quality="720p"):
     clean_url = video_url.strip()
     print(f"🚀 Asking Cobalt API to extract: {clean_url}")
     
-    api_url = "https://api.cobalt.blackcat.sweeux.org/"
-    
+    api_url = "https://cobalt.qwyku.com/"
+
     # 🛡️ Disguise our server as a normal web browser
     headers = {
         "Accept": "application/json",
