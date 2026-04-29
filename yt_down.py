@@ -1,66 +1,63 @@
-import yt_dlp
 import os
-import uuid
+import requests
+import time
 
-def download_youtube_video(video_url, output_folder="downloads", quality="720p"):
+def download_youtube_video(video_url, quality="720p"):
+    """
+    Bypasses YouTube's bot protection using the Cobalt API.
+    Returns: (safe_filename, title, thumbnail)
+    """
+    print(f"🚀 Asking Cobalt API to extract: {video_url}")
+    
+    # 1. Ask Cobalt to do the hard work and bypass YouTube
+    api_url = "https://api.cobalt.tools/api/json"
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    
+    # Tell Cobalt exactly what we want
+    payload = {
+        "url": video_url,
+        "vQuality": "720" if quality != "audio" else "max",
+        "isAudioOnly": quality == "audio"
+    }
+
     try:
-        os.makedirs(output_folder, exist_ok=True)
-        random_id = uuid.uuid4().hex[:8]
-        is_audio = (quality == "audio")
-        ext = "mp3" if is_audio else "mp4"
-        safe_filename = f"yt_{random_id}.{ext}"
-        final_path = os.path.join(output_folder, safe_filename)
+        # Send the request to Cobalt
+        response = requests.post(api_url, json=payload, headers=headers)
+        data = response.json()
 
-        print("🔗 Link detected! Firing armored yt-dlp engine...")
+        if response.status_code != 200 or data.get("status") == "error":
+            print(f"❌ Cobalt Error: {data.get('text', 'Unknown Error')}")
+            return None, None, None
+
+        # Cobalt gives us a clean, unblocked direct download link!
+        direct_download_url = data.get("url")
         
-        if quality == "best":
-            format_str = 'bestvideo+bestaudio/best'
-        elif quality == "720p":
-            format_str = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
-        elif quality == "480p":
-            format_str = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best'
-        elif quality == "audio":
-            format_str = 'bestaudio/best'
-        else:
-            format_str = 'best' 
-            
-        ydl_opts = {
-            'format': format_str, 
-            'outtmpl': final_path,  
-            'quiet': False,
-            'no_warnings': True,
-            'cookiefile': 'cookies.txt',  
-            
-            # 🛡️ THE ARMOR: Client Spoofing & Headers
-            'extractor_args': {
-                # Force YouTube to serve the standard web player, bypassing the Android VR bot-trap
-                'youtube': ['player_client=web,default'] 
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-            # Add a tiny delay so we don't hammer Google's servers and trigger rate limits
-            'sleep_interval': 2, 
-        }
+        if not direct_download_url:
+            print("❌ Cobalt did not return a valid direct link.")
+            return None, None, None
+
+        # 2. Download the actual file from Cobalt's clean link
+        timestamp = int(time.time())
+        ext = "mp3" if quality == "audio" else "mp4"
+        safe_filename = f"yt_bypass_{timestamp}.{ext}"
+        output_path = os.path.join("downloads", safe_filename)
+
+        print("📥 Bypassed! Downloading file from Cobalt to Render...")
         
-        if is_audio:
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
-        else:
-            ydl_opts['merge_output_format'] = 'mp4'
+        # Stream the download so we don't crash Render's RAM
+        file_response = requests.get(direct_download_url, stream=True)
+        with open(output_path, "wb") as f:
+            for chunk in file_response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"✅ Success! Video saved as {safe_filename}")
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(video_url, download=True)
-            title = info_dict.get('title', 'Unknown Media')
-            thumbnail = info_dict.get('thumbnail', '')
-            
-        print("✅ Native Download Complete!")
-        return safe_filename, title, thumbnail
-            
+        return safe_filename, "YouTube Video", "https://via.placeholder.com/640x360.png?text=Video+Ready"
+
     except Exception as e:
-        print(f"🚨 Engine Error: {e}")
+        print(f"🚨 Python Error in Downloader: {e}")
         return None, None, None
