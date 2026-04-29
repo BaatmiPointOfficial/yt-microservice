@@ -4,34 +4,45 @@ import time
 
 def download_youtube_video(video_url, quality="720p"):
     """
-    Bypasses YouTube's bot protection using the Cobalt V7 API.
+    Bypasses YouTube's bot protection using the Cobalt API.
     Returns: (safe_filename, title, thumbnail)
     """
-    print(f"🚀 Asking Cobalt V7 API to extract: {video_url}")
+    # 🧹 Clean the URL to remove any hidden spaces sent from the frontend
+    clean_url = video_url.strip()
+    print(f"🚀 Asking Cobalt API to extract: {clean_url}")
     
-    # 🌟 THE V7 FIX: New Endpoint
     api_url = "https://api.cobalt.tools/"
     
+    # 🛡️ Disguise our server as a normal web browser
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Origin": "https://cobalt.tools",
+        "Referer": "https://cobalt.tools/"
     }
     
-    # 🌟 THE V7 FIX: New Payload Rules
+    # 🌟 MINIMAL PAYLOAD: We only send exactly what is necessary.
     payload = {
-        "url": video_url,
-        "videoQuality": "720",
-        "downloadMode": "audio" if quality == "audio" else "auto"
+        "url": clean_url
     }
+    
+    if quality == "audio":
+        payload["downloadMode"] = "audio"
+    else:
+        payload["videoQuality"] = "720"
 
     try:
-        # Send the request to Cobalt
         response = requests.post(api_url, json=payload, headers=headers)
         
-        # Stop the exact crash you just got if Cobalt sends HTML instead of JSON
+        # 🕵️‍♂️ THE X-RAY: If it fails, read the actual error message!
         if response.status_code != 200:
             print(f"❌ Cobalt Server Error: {response.status_code}")
+            try:
+                error_details = response.json()
+                print(f"🔍 Cobalt Says: {error_details}")
+            except:
+                print(f"🔍 Cobalt Raw Error: {response.text}")
             return None, None, None
 
         data = response.json()
@@ -40,14 +51,12 @@ def download_youtube_video(video_url, quality="720p"):
             print(f"❌ Cobalt Error: {data.get('text', 'Unknown Error')}")
             return None, None, None
 
-        # Cobalt gives us a clean, unblocked direct download link!
         direct_download_url = data.get("url")
         
         if not direct_download_url:
             print("❌ Cobalt did not return a valid direct link.")
             return None, None, None
 
-        # 2. Download the actual file from Cobalt's clean link
         timestamp = int(time.time())
         ext = "mp3" if quality == "audio" else "mp4"
         safe_filename = f"yt_bypass_{timestamp}.{ext}"
@@ -55,7 +64,6 @@ def download_youtube_video(video_url, quality="720p"):
 
         print("📥 Bypassed! Downloading file from Cobalt to Render...")
         
-        # Stream the download so we don't crash Render's RAM
         file_response = requests.get(direct_download_url, stream=True)
         with open(output_path, "wb") as f:
             for chunk in file_response.iter_content(chunk_size=8192):
