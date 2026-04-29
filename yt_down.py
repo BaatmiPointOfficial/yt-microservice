@@ -4,36 +4,39 @@ import time
 
 def download_youtube_video(video_url, quality="720p"):
     """
-    Bypasses YouTube's bot protection using the Cobalt API.
+    Bypasses YouTube's bot protection using the Cobalt V7 API.
     Returns: (safe_filename, title, thumbnail)
     """
-    print(f"🚀 Asking Cobalt API to extract: {video_url}")
+    print(f"🚀 Asking Cobalt V7 API to extract: {video_url}")
     
-    # 1. Ask Cobalt to do the hard work and bypass YouTube
-    api_url = "https://api.cobalt.tools/api/json"
+    # 🌟 THE V7 FIX: New Endpoint
+    api_url = "https://api.cobalt.tools/"
     
-    # 🛡️ THE DISGUISE: Tricking Cobalt into thinking we are a Chrome browser
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Origin": "https://cobalt.tools",
-        "Referer": "https://cobalt.tools/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
     
-    # Tell Cobalt exactly what we want
+    # 🌟 THE V7 FIX: New Payload Rules
     payload = {
         "url": video_url,
-        "vQuality": "720" if quality != "audio" else "max",
-        "isAudioOnly": quality == "audio"
+        "videoQuality": "720",
+        "downloadMode": "audio" if quality == "audio" else "auto"
     }
 
     try:
         # Send the request to Cobalt
         response = requests.post(api_url, json=payload, headers=headers)
+        
+        # Stop the exact crash you just got if Cobalt sends HTML instead of JSON
+        if response.status_code != 200:
+            print(f"❌ Cobalt Server Error: {response.status_code}")
+            return None, None, None
+
         data = response.json()
 
-        if response.status_code != 200 or data.get("status") == "error":
+        if data.get("status") == "error":
             print(f"❌ Cobalt Error: {data.get('text', 'Unknown Error')}")
             return None, None, None
 
