@@ -33,3 +33,20 @@
 .instagram.com	TRUE	/	TRUE	1812619980	ps_l	1
 .instagram.com	TRUE	/	TRUE	1812619980	ps_n	1
 .instagram.com	TRUE	/	TRUE	0	rur	"CCO\05425847271461\0541809596006:01fee04dae0febacb0a6db384f84fa506a488fee28f54dbdd89e17bcf7e4baabb20d81c1"
+
+
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.facebook.com	TRUE	/	TRUE	1812631133	sb	KTyFZW3VUxXn7hRfnbcPnI2X
+.facebook.com	TRUE	/	TRUE	1786945501	datr	CkhzaHDZk-mrAYhBvq6Wh4xW
+.facebook.com	TRUE	/	TRUE	1778676664	dpr	1.25
+.facebook.com	TRUE	/	TRUE	0	ar_debug	1
+.facebook.com	TRUE	/	TRUE	1809607188	c_user	61589562651376
+.facebook.com	TRUE	/	TRUE	1812631134	ps_l	1
+.facebook.com	TRUE	/	TRUE	1812631134	ps_n	1
+.facebook.com	TRUE	/	TRUE	1809607188	xs	13%3As01bqTSQd8V1kw%3A2%3A1778071131%3A-1%3A-1%3A%3AAcxL-_JLuG1ZSDBAPwMr2fBnpGbeQTxKQoJ1rIdSnQ
+.facebook.com	TRUE	/	TRUE	1778676664	wd	1536x695
+.facebook.com	TRUE	/	TRUE	1785847862	fr	1WfVi63nc0egvwrNL.AWeZHBgtXj2JUGBn0K-IOQAXoUEH-ImNBJ-eDrUOz0O-4s0RxLo.Bp-zaQ..AAA.0.0.Bp-zk2.AWeFcaAASir4-hmTs-ywljJO5sc
+.facebook.com	TRUE	/	TRUE	0	presence	C%7B%22t3%22%3A%5B%5D%2C%22utc3%22%3A1778071864712%2C%22v%22%3A1%7D
