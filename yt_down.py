@@ -1,85 +1,58 @@
 import os
-import requests
 import time
+import yt_dlp  # The Ultimate Universal Engine!
 
 def download_youtube_video(video_url, quality="720p"):
     """
-    Bypasses bot protection using the official Cobalt API with strict v7 Headers.
+    Directly extracts media from YT, Insta, TikTok, Facebook, X, etc.
+    Bypasses 3rd party APIs entirely by running the extraction locally.
     """
     clean_url = video_url.strip()
-    print(f"🚀 Extracting Media: {clean_url}")
-    
-    api_endpoints = [
-        "https://api.cobalt.tools/",             
-        "https://cobalt-api.kwiatektv.com/",     
-        "https://api.cobalt.tools/api/json"      
-    ]
-    
-    # 🌟 FIX 1: Add the Disguise Headers back! Cobalt strictly requires these now.
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Origin": "https://cobalt.tools",
-        "Referer": "https://cobalt.tools/"
-    }
-    
-    # 🌟 FIX 2: Strict Payload. No legacy/extra parameters allowed.
-    payload = { "url": clean_url }
-    if quality == "audio":
-        payload["downloadMode"] = "audio"
-    elif quality == "best":
-        payload["videoQuality"] = "max"
-    else:
-        payload["videoQuality"] = "720" if quality == "720p" else "480"
-
-    data = None
-    
-    # The Failover Loop
-    for api_url in api_endpoints:
-        print(f"📡 Attempting connection to: {api_url}")
-        try:
-            response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("status") != "error":
-                    print(f"✅ Connected successfully to {api_url}")
-                    break 
-            else:
-                print(f"⚠️ {api_url} returned status {response.status_code}")
-                # Print the exact error so you can see it in Render!
-                print(f"🔍 Server Said: {response.text}")
-        except Exception as e:
-            print(f"⚠️ {api_url} is offline or blocked. Switching to backup...")
-            continue
-
-    if not data or data.get("status") == "error":
-        error_text = data.get('text', 'Unknown Error') if data else 'All API servers offline or rejected the request.'
-        print(f"❌ Extraction Failed: {error_text}")
-        return None, None, None
-
-    direct_download_url = data.get("url")
-    
-    if not direct_download_url:
-        print("❌ Server did not return a valid download link.")
-        return None, None, None
+    print(f"🚀 Universal Engine Extracting: {clean_url}")
 
     timestamp = int(time.time())
-    ext = "mp3" if quality == "audio" else "mp4"
-    safe_filename = f"vaniconnect_media_{timestamp}.{ext}"
-    output_path = os.path.join("downloads", safe_filename)
-
-    print("📥 Bypassed protection! Downloading file to Render...")
     
+    # Ensure the downloads folder exists
+    base_path = "downloads"
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
+
+    # 🌟 yt-dlp Configuration
+    ydl_opts = {
+        # Save file as: downloads/vaniconnect_123456_videoID.mp4
+        'outtmpl': os.path.join(base_path, f'vaniconnect_{timestamp}_%(id)s.%(ext)s'),
+        'noplaylist': True,
+        'quiet': False, # Set to False so we can see the download progress in Render logs!
+    }
+
+    # 🎛️ Quality Routing
+    if quality == "audio":
+        # Grabs the best audio stream directly. 
+        ydl_opts['format'] = 'bestaudio/best'
+    elif quality == "best":
+        # Grabs the highest possible quality pre-merged MP4
+        ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+    else: 
+        # Standard 720p or 480p fallback for speed
+        ydl_opts['format'] = 'best[height<=720][ext=mp4]/best[ext=mp4]/best'
+
     try:
-        file_response = requests.get(direct_download_url, stream=True, timeout=30)
-        with open(output_path, "wb") as f:
-            for chunk in file_response.iter_content(chunk_size=8192):
-                f.write(chunk)
-                
-        print(f"✅ Success! Media saved as {safe_filename}")
-        return safe_filename, "VaniConnect Media", "https://via.placeholder.com/640x360.png?text=Media+Ready"
-        
+        # Boot up the yt-dlp engine
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # This single line handles the scraping, decrypting, and downloading!
+            info = ydl.extract_info(clean_url, download=True)
+            
+            # Figure out exactly what filename it was saved as
+            downloaded_file_path = ydl.prepare_filename(info)
+            safe_filename = os.path.basename(downloaded_file_path)
+
+            # Grab metadata for your React UI
+            title = info.get('title', 'VaniConnect Media')
+            thumbnail = info.get('thumbnail', 'https://via.placeholder.com/640x360.png?text=Media+Ready')
+
+            print(f"✅ Success! Saved natively as {safe_filename}")
+            return safe_filename, title, thumbnail
+
     except Exception as e:
-        print(f"🚨 Render Download Error: {e}")
+        print(f"❌ Universal Downloader Error: {str(e)}")
         return None, None, None
