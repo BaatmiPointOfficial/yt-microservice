@@ -4,29 +4,30 @@ import time
 
 def download_youtube_video(video_url, quality="720p"):
     """
-    Bypasses bot protection using the official Cobalt API with built-in Failover Servers.
+    Bypasses bot protection using the official Cobalt API with strict v7 Headers.
     """
     clean_url = video_url.strip()
     print(f"🚀 Extracting Media: {clean_url}")
     
-    # 🌟 THE FIX: A list of active Cobalt instances. If one dies, it tries the next!
     api_endpoints = [
-        "https://api.cobalt.tools/",             # The Official Main Server
-        "https://cobalt-api.kwiatektv.com/",     # Backup 1
-        "https://api.cobalt.tools/api/json"      # Legacy Endpoint Backup
+        "https://api.cobalt.tools/",             
+        "https://cobalt-api.kwiatektv.com/",     
+        "https://api.cobalt.tools/api/json"      
     ]
     
+    # 🌟 FIX 1: Add the Disguise Headers back! Cobalt strictly requires these now.
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Origin": "https://cobalt.tools",
+        "Referer": "https://cobalt.tools/"
     }
     
-    # The Cobalt payload mapping
+    # 🌟 FIX 2: Strict Payload. No legacy/extra parameters allowed.
     payload = { "url": clean_url }
     if quality == "audio":
         payload["downloadMode"] = "audio"
-        payload["isAudioOnly"] = True # Sending both for backward API compatibility
     elif quality == "best":
         payload["videoQuality"] = "max"
     else:
@@ -34,7 +35,7 @@ def download_youtube_video(video_url, quality="720p"):
 
     data = None
     
-    # 🛡️ THE FAILOVER LOOP
+    # The Failover Loop
     for api_url in api_endpoints:
         print(f"📡 Attempting connection to: {api_url}")
         try:
@@ -43,16 +44,17 @@ def download_youtube_video(video_url, quality="720p"):
                 data = response.json()
                 if data.get("status") != "error":
                     print(f"✅ Connected successfully to {api_url}")
-                    break # Stop looking, we found a working server!
+                    break 
             else:
                 print(f"⚠️ {api_url} returned status {response.status_code}")
+                # Print the exact error so you can see it in Render!
+                print(f"🔍 Server Said: {response.text}")
         except Exception as e:
             print(f"⚠️ {api_url} is offline or blocked. Switching to backup...")
             continue
 
-    # If the loop finishes and data is still None, all servers are down
     if not data or data.get("status") == "error":
-        error_text = data.get('text', 'Unknown Error') if data else 'All API servers offline'
+        error_text = data.get('text', 'Unknown Error') if data else 'All API servers offline or rejected the request.'
         print(f"❌ Extraction Failed: {error_text}")
         return None, None, None
 
@@ -62,7 +64,6 @@ def download_youtube_video(video_url, quality="720p"):
         print("❌ Server did not return a valid download link.")
         return None, None, None
 
-    # Proceed with saving the file to Render
     timestamp = int(time.time())
     ext = "mp3" if quality == "audio" else "mp4"
     safe_filename = f"vaniconnect_media_{timestamp}.{ext}"
