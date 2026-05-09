@@ -2,7 +2,7 @@ import os
 import requests
 import time
 
-def download_universal_media(video_url, quality="720p"):
+def download_youtube_video(video_url, quality="720p"):
     """
     Directly hits the public Cobalt API. No RapidAPI. No Cookies. No Credit Cards.
     """
