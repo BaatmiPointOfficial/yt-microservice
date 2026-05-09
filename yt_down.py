@@ -1,76 +1,53 @@
 import os
-import requests
+import yt_dlp
 import time
 
 def download_youtube_video(video_url, quality="720p"):
     """
-    Directly hits the public Cobalt API. No RapidAPI. No Cookies. No Credit Cards.
+    Dedicated YouTube-Only Engine for V1 Launch.
+    Lightning fast, highly stable.
     """
-    print(f"🚀 Asking Official Cobalt API to extract: {video_url}")
+    print(f"🚀 Launching YouTube Engine for: {video_url}")
 
-    api_url = "https://api.cobalt.tools/api/json"
-
-    # 🛡️ THE VIP HEADERS: These exact 5 lines stop Cloudflare from blocking your Render server
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Origin": "https://cobalt.tools",
-        "Referer": "https://cobalt.tools/"
-    }
-
-    # Clean the URL to prevent weird formatting errors
-    payload = {
-        "url": video_url.strip(),
-    }
+    timestamp = int(time.time())
+    output_folder = "downloads"
     
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # Standard fast configuration for YouTube
+    ydl_opts = {
+        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+        'outtmpl': f'{output_folder}/vaniconnect_{timestamp}_%(id)s.%(ext)s',
+        'noplaylist': True,
+        'quiet': False # Set to false so you can see the progress in Render logs!
+    }
+
     if quality == "audio":
-        payload["isAudioOnly"] = True
-    else:
-        payload["videoQuality"] = "720"
+        ydl_opts['format'] = 'bestaudio/best'
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
 
     try:
-        # 1. Ask Cobalt for the direct video link
-        response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-
-        if response.status_code != 200:
-            print(f"❌ Cobalt Blocked it. Status: {response.status_code}")
-            print(f"🔍 Server Response: {response.text}")
-            return None, None, None
-
-        data = response.json()
-        
-        if data.get("status") == "error":
-            print(f"❌ Cobalt Extraction Error: {data.get('text')}")
-            return None, None, None
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Download the video
+            info_dict = ydl.extract_info(video_url, download=True)
             
-        direct_download_url = data.get("url")
+            # Find out what the file was actually named
+            downloaded_file_path = ydl.prepare_filename(info_dict)
+            if quality == "audio":
+                downloaded_file_path = downloaded_file_path.rsplit('.', 1)[0] + '.mp3'
+            
+            safe_filename = os.path.basename(downloaded_file_path)
+            title = info_dict.get('title', 'VaniConnect Video')
+            thumbnail = info_dict.get('thumbnail', 'https://via.placeholder.com/640x360.png?text=Media+Ready')
 
-        if not direct_download_url:
-            print("❌ Cobalt didn't find a valid video link.")
-            return None, None, None
-
-        # 2. Download the unblocked video directly to your Render Server
-        timestamp = int(time.time())
-        ext = "mp3" if quality == "audio" else "mp4"
-        safe_filename = f"vaniconnect_{timestamp}.{ext}"
-        
-        output_path = os.path.join("downloads", safe_filename)
-        
-        # Ensure the folder exists
-        if not os.path.exists("downloads"):
-            os.makedirs("downloads")
-
-        print("📥 Bypassed Meta! Downloading media to Render...")
-        file_response = requests.get(direct_download_url, stream=True, timeout=30)
-        
-        with open(output_path, "wb") as f:
-            for chunk in file_response.iter_content(chunk_size=8192):
-                f.write(chunk)
-
-        print(f"✅ Success! Saved natively as {safe_filename}")
-        return safe_filename, "VaniConnect Media", "https://via.placeholder.com/640x360.png?text=Media+Ready"
+            print(f"✅ Success! Downloaded: {title}")
+            return safe_filename, title, thumbnail
 
     except Exception as e:
-        print(f"🚨 Python Error: {str(e)}")
+        print(f"🚨 YouTube Engine Error: {str(e)}")
         return None, None, None
