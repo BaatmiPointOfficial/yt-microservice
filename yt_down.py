@@ -20,7 +20,8 @@ def download_youtube_video(video_url, quality="720p"):
         'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
         'outtmpl': f'{output_folder}/vaniconnect_{timestamp}_%(id)s.%(ext)s',
         'noplaylist': True,
-        'quiet': False # Set to false so you can see the progress in Render logs!
+        'quiet': False,
+        'cookiefile': 'cookies.txt'  # 👈 THIS IS THE BOMB THAT DESTROYS THE WALL
     }
 
     if quality == "audio":
