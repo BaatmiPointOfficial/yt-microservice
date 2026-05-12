@@ -15,10 +15,9 @@ def download_youtube_video(video_url, quality="720p"):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # Bulletproof configuration for standard videos AND vertical Shorts
     ydl_opts = {
-        # Tries 720p first -> then tries 'best' mp4 -> then grabs whatever is available
-        'format': 'bestvideo[height<=720]+bestaudio/best[ext=mp4]/best',
+        # Drops the 720p height limit completely to guarantee a match
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': f'{output_folder}/vaniconnect_{timestamp}_%(id)s.%(ext)s',
         'noplaylist': True,
         'quiet': False,
