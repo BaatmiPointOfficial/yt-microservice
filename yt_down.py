@@ -1,74 +1,77 @@
 import os
 import requests
 import time
+import re
+
+def extract_video_id(url):
+    """Extracts the exact 11-character video ID from any YouTube/Shorts link"""
+    match = re.search(r"(?:v=|/)([0-9A-Za-z_-]{11}).*", url)
+    return match.group(1) if match else None
 
 def download_youtube_video(video_url, quality="720p"):
     """
-    The 'Hydra' Engine for YouTube.
-    Bypasses YouTube's Bot blocks by routing through the Cobalt Community Network.
+    The Piped API Engine. 
+    Bypasses yt-dlp and Cobalt entirely by querying the open-source Piped network.
     """
-    print(f"🚀 Asking Cobalt Network to fetch YouTube video: {video_url}")
+    print(f"🚀 Using Piped Open-Source Network for: {video_url}")
 
-    # The Hydra array: Community servers that handle YouTube's anti-bot security for us
-    cobalt_servers = [
-        "https://cobalt.omkr.in/api/json",
-        "https://cobalt.canine.ly/api/json",
-        "https://cobalt.shovit.dev/api/json"
-    ]
-
-    payload = {"url": video_url.strip()}
-    if quality == "audio": 
-        payload["isAudioOnly"] = True
-    else: 
-        payload["videoQuality"] = "720"
-
-    direct_download_url = None
-
-    # 1. Ask the network for the unblocked video link
-    for api_url in cobalt_servers:
-        domain = "/".join(api_url.split("/")[:3])
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Origin": domain,
-            "Referer": domain + "/"
-        }
-
-        try:
-            response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("status") != "error" and data.get("url"):
-                    direct_download_url = data.get("url")
-                    print(f"✅ Success! {domain} bypassed YouTube's security.")
-                    break
-        except Exception:
-            print(f"⚠️ Server {domain} timeout. Pivoting to next...")
-            continue
-
-    if not direct_download_url:
-        print("❌ All community servers are currently busy.")
+    video_id = extract_video_id(video_url)
+    if not video_id:
+        print("❌ Could not extract YouTube Video ID.")
         return None, None, None
 
-    # 2. Download the video directly to Render
-    timestamp = int(time.time())
-    ext = "mp3" if quality == "audio" else "mp4"
-    safe_filename = f"vaniconnect_{timestamp}.{ext}"
-    
-    output_path = os.path.join("downloads", safe_filename)
-    if not os.path.exists("downloads"):
-        os.makedirs("downloads")
+    # Hitting the primary, highly-stable Piped API instance
+    piped_api = f"https://pipedapi.kavin.rocks/streams/{video_id}"
 
-    print("📥 Downloading media to Render storage...")
     try:
-        file_response = requests.get(direct_download_url, stream=True, timeout=30)
+        # 1. Ask Piped for the raw video stream data
+        response = requests.get(piped_api, timeout=15)
+        if response.status_code != 200:
+            print(f"❌ Piped API rejected the request. Status: {response.status_code}")
+            return None, None, None
+
+        data = response.json()
+        video_streams = data.get("videoStreams", [])
+
+        if not video_streams:
+            print("❌ No video streams found on Piped.")
+            return None, None, None
+
+        # 2. Find a combined Audio+Video MP4 stream (Usually 720p or 360p)
+        direct_url = None
+        for stream in video_streams:
+            # We want an MP4 file that is NOT just video-only (needs audio included)
+            if stream.get("format") == "MPEG_4" and stream.get("videoOnly") is False:
+                direct_url = stream.get("url")
+                # If we find 720p, lock it in and break the loop. Otherwise, keep the first one found.
+                if stream.get("quality") == "720p":
+                    break
+
+        if not direct_url:
+            print("❌ No combined MP4 format available on this video.")
+            return None, None, None
+
+        # 3. Download the raw file directly to Render
+        timestamp = int(time.time())
+        safe_filename = f"vaniconnect_{timestamp}.mp4"
+        output_path = os.path.join("downloads", safe_filename)
+
+        if not os.path.exists("downloads"):
+            os.makedirs("downloads")
+
+        print("📥 Raw stream found! Downloading directly to Render...")
+        file_response = requests.get(direct_url, stream=True, timeout=60)
+        
         with open(output_path, "wb") as f:
             for chunk in file_response.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        print(f"✅ Download Complete! Saved natively as {safe_filename}")
-        return safe_filename, "VaniConnect Media", "https://via.placeholder.com/640x360.png?text=Media+Ready"
+        title = data.get("title", "VaniConnect Video")
+        thumbnail = data.get("thumbnailUrl", "https://via.placeholder.com/640")
+
+        print(f"✅ Success! Saved natively as {safe_filename}")
+        return safe_filename, title, thumbnail
+
     except Exception as e:
-        print(f"🚨 Download writing error: {e}")
+        print(f"🚨 Engine Error: {e}")
         return None, None, None
