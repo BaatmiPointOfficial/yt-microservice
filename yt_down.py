@@ -15,13 +15,14 @@ def download_youtube_video(video_url, quality="720p"):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # Standard fast configuration for YouTube
+    # Bulletproof configuration for standard videos AND vertical Shorts
     ydl_opts = {
-        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+        # Tries 720p first -> then tries 'best' mp4 -> then grabs whatever is available
+        'format': 'bestvideo[height<=720]+bestaudio/best[ext=mp4]/best',
         'outtmpl': f'{output_folder}/vaniconnect_{timestamp}_%(id)s.%(ext)s',
         'noplaylist': True,
         'quiet': False,
-        'cookiefile': 'cookies.txt'  # 👈 THIS IS THE BOMB THAT DESTROYS THE WALL
+        'cookiefile': 'cookies.txt' 
     }
 
     if quality == "audio":
