@@ -33,6 +33,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "https://vaniconnect-studio.vercel.app",
+        "https://clipeto.com",          
+    "https://www.clipeto.com"
         
     ],
     allow_credentials=True,
