@@ -94,7 +94,8 @@ class VerifyRequest(BaseModel):
     user_id: str
 
 # 8️⃣ FIREBASE ADMIN SETUP
-cred = credentials.Certificate("firebase_key.json")
+key_path = "/etc/secrets/firebase_key.json" if os.path.exists("/etc/secrets/firebase_key.json") else "firebase_key.json"
+cred = credentials.Certificate(key_path)
 
 # 🔥 FIX: Check if Firebase is already initialized to prevent reload crashes
 if not firebase_admin._apps:
