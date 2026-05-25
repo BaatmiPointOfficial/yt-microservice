@@ -21,7 +21,7 @@ bucket_name = os.getenv('R2_BUCKET_NAME')
 # 3️⃣ HUGGING FACE SETUP
 HF_TOKEN = os.getenv('HF_TOKEN') # You will need to add this to Render Environment Variables!
 # Replace this URL with your actual Hugging Face Space API endpoint
-HF_API_URL = "https://your-huggingface-space-url.hf.space/api/predict" 
+HF_API_URL = "https://vaniconnect-vaniconnect-api.hf.space" 
 
 # 4️⃣ FIREBASE SETUP (So the worker can update the database)
 if not firebase_admin._apps:
