@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 from typing import Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
+from redis import Redis
+from rq import Queue
 
 # 🤖 YOUR AI TOOLS
 import yt_down  
@@ -57,6 +59,7 @@ r2_secret_key = os.getenv('R2_SECRET_ACCESS_KEY')
 r2_endpoint = os.getenv('R2_ENDPOINT_URL')
 bucket_name = os.getenv('R2_BUCKET_NAME')
 
+
 s3 = boto3.client(
     's3',
     endpoint_url=r2_endpoint,
@@ -64,6 +67,15 @@ s3 = boto3.client(
     aws_secret_access_key=r2_secret_key,
     region_name='auto' 
 )
+# ---------------------------------------------------------
+# 🚦 REDIS QUEUE SETUP (The Ticket Rail)
+# ---------------------------------------------------------
+redis_url = os.getenv('REDIS_URL')
+if redis_url:
+    redis_conn = Redis.from_url(redis_url)
+    video_queue = Queue('video-processing', connection=redis_conn)
+else:
+    print("⚠️ WARNING: REDIS_URL is not set!")
 
 # 7️⃣ RAZORPAY SETUP
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
@@ -307,3 +319,60 @@ async def process_single_clip(
 def test_database():
     user_data = db.get_or_create_user("ceo@vaniconnect.com")
     return {"message": "Database is working perfectly!", "user_data": user_data}
+
+@app.post("/api/remove-video-watermark")
+@limiter.limit("5/minute")
+async def process_video_watermark(
+    request: Request,
+    file: UploadFile = File(...),
+    mode: str = Form(...),
+    user_id: str = Form(...),
+    x: int = Form(0), y: int = Form(0), w: int = Form(0), h: int = Form(0)
+):
+    # 1. Standard Safety Checks
+    user_data = db.get_or_create_user(user_id)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="User not found.")
+        
+    is_pro = user_data.get("isProUser", False)
+    credits_left = user_data.get("free_credits", 0)
+
+    if not is_pro and credits_left <= 0:
+        raise HTTPException(status_code=402, detail="PaywallTrigger: Out of credits.")
+
+    # 2. Save the incoming file temporarily
+    temp_path = f"downloads/raw_watermark_{file.filename}"
+    with open(temp_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    # 3. Upload raw video to Cloudflare R2 so the Worker can access it
+    r2_key = f'uploads/raw_watermark_{file.filename}'
+    try:
+        with open(temp_path, 'rb') as video_file:
+            s3.put_object(Bucket=bucket_name, Key=r2_key, Body=video_file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to upload to Cloudflare R2")
+    
+    # Clean up the temp file
+    os.remove(temp_path)
+
+    # 4. 🎟️ DROP THE TICKET INTO THE QUEUE!
+    # We tell the queue to run a function called 'run_hf_watermark_removal'
+    job_data = {
+        "user_id": user_id,
+        "r2_file_key": r2_key,
+        "mode": mode,
+        "x": x, "y": y, "w": w, "h": h
+    }
+    
+    # Enqueue the job (This is instant!)
+    job = video_queue.enqueue('hf_tasks.run_hf_watermark_removal', job_data)
+
+    print(f"🎟️ Ticket {job.get_id()} added to queue for User {user_id}!")
+
+    # 5. Instantly reply to React so the browser doesn't timeout!
+    return {
+        "message": "Video added to processing queue!",
+        "job_id": job.get_id(),
+        "status": "processing"
+    }
