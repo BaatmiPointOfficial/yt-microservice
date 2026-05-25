@@ -37,6 +37,7 @@ app.add_middleware(
         "https://vaniconnect-studio.vercel.app",
         "https://clipeto.com",          
     "https://www.clipeto.com"
+   
         
     ],
     allow_credentials=True,
