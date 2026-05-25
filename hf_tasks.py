@@ -39,11 +39,8 @@ def run_hf_watermark_removal(job_data):
     
     print(f"🚀 [WORKER] Starting job for User {user_id}. Fetching: {r2_file_key}")
 
-    # Step 1: Download the raw video from Cloudflare R2
-    local_input_path = f"downloads/worker_raw_{os.path.basename(r2_file_key)}"
-    
-    # Create the downloads folder if it doesn't exist yet
-    os.makedirs("downloads", exist_ok=True)
+    # Step 1: Download the raw video from Cloudflare R2 into the Linux temp folder
+    local_input_path = f"/tmp/worker_raw_{os.path.basename(r2_file_key)}"
 
     # Now download the file (THIS LINE IS FIXED)
     s3.download_file(bucket_name, r2_file_key, local_input_path)
@@ -74,7 +71,7 @@ def run_hf_watermark_removal(job_data):
         return False
 
     # Step 3: Save the clean video returning from Hugging Face
-    local_output_path = f"downloads/worker_clean_{os.path.basename(r2_file_key)}"
+    local_output_path = f"/tmp/worker_clean_{os.path.basename(r2_file_key)}"
     with open(local_output_path, "wb") as f:
         f.write(response.content)
     print("✅ [WORKER] Success! Received clean video from Hugging Face.")
