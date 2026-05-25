@@ -20,8 +20,8 @@ bucket_name = os.getenv('R2_BUCKET_NAME')
 
 # 3️⃣ HUGGING FACE SETUP
 HF_TOKEN = os.getenv('HF_TOKEN') # You will need to add this to Render Environment Variables!
-# Replace this URL with your actual Hugging Face Space API endpoint
-HF_API_URL = "https://vaniconnect-vaniconnect-api.hf.space" 
+# Added the exact API path so it hits your specific model
+HF_API_URL = "https://vaniconnect-vaniconnect-api.hf.space/api/remove-video-watermark" 
 
 # 4️⃣ FIREBASE SETUP (So the worker can update the database)
 if not firebase_admin._apps:
@@ -41,13 +41,18 @@ def run_hf_watermark_removal(job_data):
 
     # Step 1: Download the raw video from Cloudflare R2
     local_input_path = f"downloads/worker_raw_{os.path.basename(r2_file_key)}"
+    
+    # Create the downloads folder if it doesn't exist yet
+    os.makedirs("downloads", exist_ok=True)
+
+    # Now download the file (THIS LINE IS FIXED)
     s3.download_file(bucket_name, r2_file_key, local_input_path)
     print("✅ [WORKER] Downloaded video from R2.")
 
     # Step 2: Send to Hugging Face API
     print("🧠 [WORKER] Sending video to Hugging Face GPU... (This might take a few minutes)")
     
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
     
     # We send the file and the parameters (x, y, width, height) to your AI model
     with open(local_input_path, "rb") as f:
