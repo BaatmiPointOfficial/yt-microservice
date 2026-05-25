@@ -25,7 +25,8 @@ HF_API_URL = "https://vaniconnect-vaniconnect-api.hf.space"
 
 # 4️⃣ FIREBASE SETUP (So the worker can update the database)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_key.json")
+    key_path = "/etc/secrets/firebase_key.json" if os.path.exists("/etc/secrets/firebase_key.json") else "firebase_key.json"
+    cred = credentials.Certificate(key_path)
     firebase_admin.initialize_app(cred)
 firestore_db = firestore.client()
 
