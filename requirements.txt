@@ -10,3 +10,5 @@ python-multipart
 slowapi
 moviepy==1.0.3
 opencv-python-headless
+redis==5.0.4
+rq==1.16.1
