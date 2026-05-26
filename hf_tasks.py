@@ -89,8 +89,9 @@ def run_hf_watermark_removal(job_data):
         # If the API returns 'file_name' instead of a full link, build the Hugging Face file download link dynamically!
         if not hf_video_url and 'file_name' in response_data:
             filename_clean = response_data['file_name']
-            # This constructs the direct download link from your Hugging Face Space files endpoint
-            hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/file={filename_clean}"
+            
+            # 🚀 UPDATED DIRECT ENDPOINT ROUTE TO BREAK THE 404:
+            hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/file/{filename_clean}"
         
         if not hf_video_url:
             print("❌ [WORKER] Critical Path Error: Hugging Face response did not contain a valid URL link or file_name key.")
