@@ -75,31 +75,39 @@ def run_hf_watermark_removal(job_data):
         print(f"📄 [WORKER] First 500 characters of response: {response.text[:500]}")
         return False
 
-    # Step 3: Save the clean video returning from Hugging Face
-    local_output_path = f"/tmp/worker_clean_{os.path.basename(r2_file_key)}"
-    with open(local_output_path, "wb") as f:
-        f.write(response.content)
-    print("✅ [WORKER] Success! Received clean video from Hugging Face.")
+# Step 3: Parse the response from Hugging Face
+    print("✅ [WORKER] Success! Received response from Hugging Face.")
+    
+    try:
+        response_data = response.json()
+        # Look for the video URL inside the JSON response
+        # It might be called 'url', 'video', 'file', or 'cleaned_video_url'. Let's find it dynamically:
+        hf_video_url = response_data.get('url') or response_data.get('video') or response_data.get('file') or response_data.get('cleaned_video_url')
+        
+        if not hf_video_url:
+            print(f"❌ [WORKER] Could not find video link inside Hugging Face JSON: {response_data}")
+            return False
+            
+        print(f"🔗 [WORKER] Found processed video URL: {hf_video_url}")
+    except Exception as parse_err:
+        print(f"❌ [WORKER] Failed to parse Hugging Face JSON response: {str(parse_err)}")
+        return False
 
-    # Step 4: Convert Video Container to Web-Safe H.264 Codec for Chrome compatibility
-    # Extract just the raw filename without folder structures safely
-    pure_filename = os.path.basename(r2_file_key)
-    web_safe_output_path = f"/tmp/web_{pure_filename}"
+    # Step 4: Download the actual video file from that link
+    local_output_path = f"/tmp/worker_clean_{os.path.basename(r2_file_key)}"
+    print(f"📥 [WORKER] Downloading actual video file from Hugging Face storage...")
+    video_file_res = requests.get(hf_video_url)
     
-    print(f"🎬 [WORKER] Converting video tracks to H.264 (Web Standard)... Input: {local_output_path} -> Output: {web_safe_output_path}")
-    
-    # Force input format to mp4 and add the faststart flag to move the moov atom index to the front of the file!
-    print("🎬 [WORKER] Re-indexing video container keys for Chrome...")
-    os.system(f'ffmpeg -y -mjpeg_idct auto -i "{local_output_path}" -vcodec libx264 -pix_fmt yuv420p -movflags +faststart -acodec aac "{web_safe_output_path}"')
+    with open(local_output_path, "wb") as f:
+        f.write(video_file_res.content)
+    print("✅ [WORKER] Video file successfully saved to temp disk.")
 
     # Step 5: Push normalized asset back to Cloudflare R2
+    pure_filename = os.path.basename(r2_file_key)
     final_r2_key = f"completed/clean_{pure_filename}"
-    
-    # VERIFICATION CHECK: If FFmpeg fails or skips, fallback safely to the original clean video so it never crashes!
-    upload_target = web_safe_output_path if os.path.exists(web_safe_output_path) else local_output_path
-    print(f"☁️ [WORKER] Uploading finalized file to R2 path: {upload_target}")
+    print(f"☁️ [WORKER] Uploading finalized file to R2 path: {local_output_path}")
 
-    with open(upload_target, 'rb') as f:
+    with open(local_output_path, 'rb') as f:
         s3.put_object(Bucket=bucket_name, Key=final_r2_key, Body=f)
     print(f"☁️ [WORKER] Upload complete: {final_r2_key}")
     
@@ -117,7 +125,6 @@ def run_hf_watermark_removal(job_data):
     try:
         if os.path.exists(local_input_path): os.remove(local_input_path)
         if os.path.exists(local_output_path): os.remove(local_output_path)
-        if os.path.exists(web_safe_output_path): os.remove(web_safe_output_path)
         print("🧹 [WORKER] Temporary operational files scrubbed.")
     except Exception as e:
         print(f"⚠️ [WORKER] Cache scrubbing notice: {str(e)}")
