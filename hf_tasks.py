@@ -76,26 +76,32 @@ def run_hf_watermark_removal(job_data):
         print(f"❌ [WORKER] Model Pipeline Return Error Code {response.status_code}: {response.text}")
         return False
 
-    # STEP 3: Handle JSON Parsing and Link Extraction safely
+   # STEP 3: Handle JSON Parsing and Link Extraction safely
     local_output_path = f"/tmp/worker_clean_{os.path.basename(r2_file_key)}"
     
     try:
         response_data = response.json()
         print(f"📄 [WORKER] Decoded API Payload Array: {response_data}")
         
-        # Pull out the dynamic download URL returned from your model structure
-        hf_video_url = response_data.get('url') or response_data.get('video') or response_data.get('file') or response_data.get('data', [None])[0]
+        # 🚀 SMART LINK LOOKUP FOR YOUR SPECIFIC API OUTPUT
+        hf_video_url = response_data.get('url') or response_data.get('video') or response_data.get('file')
+        
+        # If the API returns 'file_name' instead of a full link, build the Hugging Face file download link dynamically!
+        if not hf_video_url and 'file_name' in response_data:
+            filename_clean = response_data['file_name']
+            # This constructs the direct download link from your Hugging Face Space files endpoint
+            hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/file={filename_clean}"
         
         if not hf_video_url:
-            print("❌ [WORKER] Critical Path Error: Hugging Face response did not contain a valid string URL key.")
+            print("❌ [WORKER] Critical Path Error: Hugging Face response did not contain a valid URL link or file_name key.")
             return False
             
-        print(f"🔗 [WORKER] Located streaming link path: {hf_video_url}")
+        print(f"🔗 [WORKER] Successfully built streaming link path: {hf_video_url}")
         
     except Exception as json_err:
         print(f"❌ [WORKER] Content mismatch. Expected JSON format but engine failed to parse response payload: {str(json_err)}")
         return False
-
+    
     # STEP 4: Download binary data stream from Hugging Face storage host link
     print(f"📥 [WORKER] Syncing video stream from Hugging Face storage cluster...")
     try:
@@ -148,4 +154,4 @@ def run_hf_watermark_removal(job_data):
     except Exception as e:
         print(f"⚠️ [WORKER] Cache scrub operation log tracking: {str(e)}")
 
-    return True
+    return True 
