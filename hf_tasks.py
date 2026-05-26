@@ -66,24 +66,32 @@ def run_hf_watermark_removal(job_data):
         print(f"❌ [WORKER] Hugging Face Error: {response.text}")
         return False
 
-    # Step 3: Write incoming buffer to temporary disk storage
+    # Step 3: Save the clean video returning from Hugging Face
     local_output_path = f"/tmp/worker_clean_{os.path.basename(r2_file_key)}"
     with open(local_output_path, "wb") as f:
         f.write(response.content)
     print("✅ [WORKER] Success! Received clean video from Hugging Face.")
 
     # Step 4: Convert Video Container to Web-Safe H.264 Codec for Chrome compatibility
-    web_safe_output_path = f"/tmp/web_{os.path.basename(r2_file_key)}"
-    print("🎬 [WORKER] Converting video tracks to H.264 (Web Standard)...")
+    # Extract just the raw filename without folder structures safely
+    pure_filename = os.path.basename(r2_file_key)
+    web_safe_output_path = f"/tmp/web_{pure_filename}"
     
-    # Executes native FFmpeg directly inside the Render container matrix
+    print(f"🎬 [WORKER] Converting video tracks to H.264 (Web Standard)... Input: {local_output_path} -> Output: {web_safe_output_path}")
+    
+    # Force FFmpeg to use absolute, verified paths on the Linux disk
     os.system(f'ffmpeg -y -i "{local_output_path}" -vcodec libx264 -pix_fmt yuv420p -acodec aac "{web_safe_output_path}"')
 
     # Step 5: Push normalized asset back to Cloudflare R2
-    final_r2_key = f"completed/clean_{os.path.basename(r2_file_key)}"
-    with open(web_safe_output_path, 'rb') as f:
+    final_r2_key = f"completed/clean_{pure_filename}"
+    
+    # VERIFICATION CHECK: If FFmpeg fails or skips, fallback safely to the original clean video so it never crashes!
+    upload_target = web_safe_output_path if os.path.exists(web_safe_output_path) else local_output_path
+    print(f"☁️ [WORKER] Uploading finalized file to R2 path: {upload_target}")
+
+    with open(upload_target, 'rb') as f:
         s3.put_object(Bucket=bucket_name, Key=final_r2_key, Body=f)
-    print(f"☁️ [WORKER] Uploaded web-safe clean video to R2: {final_r2_key}")
+    print(f"☁️ [WORKER] Upload complete: {final_r2_key}")
     
     # Step 6: Dispatch live webhook tracking state to Firestore
     job_ref = firestore_db.collection('users').document(user_id).collection('processed_videos').document()
@@ -97,10 +105,9 @@ def run_hf_watermark_removal(job_data):
 
     # Step 7: Clear operational cache from storage drive to keep Render clean
     try:
-        os.remove(local_input_path)
-        os.remove(local_output_path)
-        if os.path.exists(web_safe_output_path):
-            os.remove(web_safe_output_path)
+        if os.path.exists(local_input_path): os.remove(local_input_path)
+        if os.path.exists(local_output_path): os.remove(local_output_path)
+        if os.path.exists(web_safe_output_path): os.remove(web_safe_output_path)
         print("🧹 [WORKER] Temporary operational files scrubbed.")
     except Exception as e:
         print(f"⚠️ [WORKER] Cache scrubbing notice: {str(e)}")
