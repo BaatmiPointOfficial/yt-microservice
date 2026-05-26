@@ -19,11 +19,10 @@ s3 = boto3.client(
 bucket_name = os.getenv('R2_BUCKET_NAME')
 
 # 3️⃣ HUGGING FACE SETUP
-HF_TOKEN = os.getenv('HF_TOKEN') # You will need to add this to Render Environment Variables!
-# Added the exact API path so it hits your specific model
+HF_TOKEN = os.getenv('HF_TOKEN') 
 HF_API_URL = "https://vaniconnect-vaniconnect-api.hf.space/api/remove-video-watermark" 
 
-# 4️⃣ FIREBASE SETUP (So the worker can update the database)
+# 4️⃣ FIREBASE SETUP
 if not firebase_admin._apps:
     key_path = "/etc/secrets/firebase_key.json" if os.path.exists("/etc/secrets/firebase_key.json") else "firebase_key.json"
     cred = credentials.Certificate(key_path)
@@ -39,26 +38,22 @@ def run_hf_watermark_removal(job_data):
     
     print(f"🚀 [WORKER] Starting job for User {user_id}. Fetching: {r2_file_key}")
 
-    # Step 1: Download the raw video from Cloudflare R2 into the Linux temp folder
+    # Step 1: Download raw video into Linux temporary space
     local_input_path = f"/tmp/worker_raw_{os.path.basename(r2_file_key)}"
-
-    # Now download the file (THIS LINE IS FIXED)
     s3.download_file(bucket_name, r2_file_key, local_input_path)
     print("✅ [WORKER] Downloaded video from R2.")
 
-    # Step 2: Send to Hugging Face API
+    # Step 2: Forward payload to Hugging Face GPU Cluster
     print("🧠 [WORKER] Sending video to Hugging Face GPU... (This might take a few minutes)")
-    
     headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
     
-    # We send the file and the parameters to your AI model
     with open(local_input_path, "rb") as f:
         response = requests.post(
             HF_API_URL, 
             headers=headers, 
             files={"file": f},
             data={
-                "user_id": user_id,  # <--- ADD THIS EXACT LINE
+                "user_id": user_id,
                 "mode": job_data['mode'], 
                 "x": job_data['x'], 
                 "y": job_data['y'], 
@@ -71,32 +66,43 @@ def run_hf_watermark_removal(job_data):
         print(f"❌ [WORKER] Hugging Face Error: {response.text}")
         return False
 
-    # Step 3: Save the clean video returning from Hugging Face
+    # Step 3: Write incoming buffer to temporary disk storage
     local_output_path = f"/tmp/worker_clean_{os.path.basename(r2_file_key)}"
     with open(local_output_path, "wb") as f:
         f.write(response.content)
     print("✅ [WORKER] Success! Received clean video from Hugging Face.")
 
-    # Step 4: Upload the finished video BACK to Cloudflare R2
-    final_r2_key = f"completed/clean_{os.path.basename(r2_file_key)}"
-    with open(local_output_path, 'rb') as f:
-        s3.put_object(Bucket=bucket_name, Key=final_r2_key, Body=f)
-    print(f"☁️ [WORKER] Uploaded clean video to R2: {final_r2_key}")
+    # Step 4: Convert Video Container to Web-Safe H.264 Codec for Chrome compatibility
+    web_safe_output_path = f"/tmp/web_{os.path.basename(r2_file_key)}"
+    print("🎬 [WORKER] Converting video tracks to H.264 (Web Standard)...")
     
-    # Step 5: Notify Firebase! 
-    # Your React frontend should listen to this document to know when to show the download button
+    # Executes native FFmpeg directly inside the Render container matrix
+    os.system(f'ffmpeg -y -i "{local_output_path}" -vcodec libx264 -pix_fmt yuv420p -acodec aac "{web_safe_output_path}"')
+
+    # Step 5: Push normalized asset back to Cloudflare R2
+    final_r2_key = f"completed/clean_{os.path.basename(r2_file_key)}"
+    with open(web_safe_output_path, 'rb') as f:
+        s3.put_object(Bucket=bucket_name, Key=final_r2_key, Body=f)
+    print(f"☁️ [WORKER] Uploaded web-safe clean video to R2: {final_r2_key}")
+    
+    # Step 6: Dispatch live webhook tracking state to Firestore
     job_ref = firestore_db.collection('users').document(user_id).collection('processed_videos').document()
     job_ref.set({
         "status": "completed",
         "original_file": r2_file_key,
-        "final_file_url": f"{os.getenv('R2_PUBLIC_DOMAIN')}/{final_r2_key}", # Your public R2 domain
+        "final_file_url": f"{os.getenv('R2_PUBLIC_DOMAIN')}/{final_r2_key}", 
         "tool": "video-watermark",
     })
-
     print(f"🎉 [WORKER] Job complete! Notified Firebase.")
 
-    # Step 6: Clean up local files to save server memory
-    os.remove(local_input_path)
-    os.remove(local_output_path)
+    # Step 7: Clear operational cache from storage drive to keep Render clean
+    try:
+        os.remove(local_input_path)
+        os.remove(local_output_path)
+        if os.path.exists(web_safe_output_path):
+            os.remove(web_safe_output_path)
+        print("🧹 [WORKER] Temporary operational files scrubbed.")
+    except Exception as e:
+        print(f"⚠️ [WORKER] Cache scrubbing notice: {str(e)}")
 
     return True
