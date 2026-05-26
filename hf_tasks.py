@@ -51,13 +51,14 @@ def run_hf_watermark_removal(job_data):
     
     headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
     
-    # We send the file and the parameters (x, y, width, height) to your AI model
+    # We send the file and the parameters to your AI model
     with open(local_input_path, "rb") as f:
         response = requests.post(
             HF_API_URL, 
             headers=headers, 
             files={"file": f},
             data={
+                "user_id": user_id,  # <--- ADD THIS EXACT LINE
                 "mode": job_data['mode'], 
                 "x": job_data['x'], 
                 "y": job_data['y'], 
