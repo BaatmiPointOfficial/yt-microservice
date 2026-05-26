@@ -62,8 +62,17 @@ def run_hf_watermark_removal(job_data):
             }
         )
     
+    print(f"📡 [WORKER] Hugging Face Response Status: {response.status_code}")
+    print(f"📡 [WORKER] Content-Type received: {response.headers.get('Content-Type')}")
+
     if response.status_code != 200:
-        print(f"❌ [WORKER] Hugging Face Error: {response.text}")
+        print(f"❌ [WORKER] Hugging Face Error Code {response.status_code}: {response.text[:500]}")
+        return False
+
+    # CRITICAL CHECK: If Hugging Face returns text/html instead of a video file, stop!
+    if "text" in response.headers.get('Content-Type', ''):
+        print(f"❌ [WORKER] CRITICAL: Hugging Face sent back HTML text instead of a video file!")
+        print(f"📄 [WORKER] First 500 characters of response: {response.text[:500]}")
         return False
 
     # Step 3: Save the clean video returning from Hugging Face
@@ -82,7 +91,7 @@ def run_hf_watermark_removal(job_data):
     # Force input format to mp4 and add the faststart flag to move the moov atom index to the front of the file!
     print("🎬 [WORKER] Re-indexing video container keys for Chrome...")
     os.system(f'ffmpeg -y -mjpeg_idct auto -i "{local_output_path}" -vcodec libx264 -pix_fmt yuv420p -movflags +faststart -acodec aac "{web_safe_output_path}"')
-    
+
     # Step 5: Push normalized asset back to Cloudflare R2
     final_r2_key = f"completed/clean_{pure_filename}"
     
