@@ -79,9 +79,10 @@ def run_hf_watermark_removal(job_data):
     
     print(f"🎬 [WORKER] Converting video tracks to H.264 (Web Standard)... Input: {local_output_path} -> Output: {web_safe_output_path}")
     
-    # Force FFmpeg to use absolute, verified paths on the Linux disk
-    os.system(f'ffmpeg -y -i "{local_output_path}" -vcodec libx264 -pix_fmt yuv420p -acodec aac "{web_safe_output_path}"')
-
+    # Force input format to mp4 and add the faststart flag to move the moov atom index to the front of the file!
+    print("🎬 [WORKER] Re-indexing video container keys for Chrome...")
+    os.system(f'ffmpeg -y -mjpeg_idct auto -i "{local_output_path}" -vcodec libx264 -pix_fmt yuv420p -movflags +faststart -acodec aac "{web_safe_output_path}"')
+    
     # Step 5: Push normalized asset back to Cloudflare R2
     final_r2_key = f"completed/clean_{pure_filename}"
     
