@@ -83,18 +83,25 @@ def run_hf_watermark_removal(job_data):
         response_data = response.json()
         print(f"📄 [WORKER] Decoded API Payload Array: {response_data}")
         
+        # 1. Check if the response contains a direct URL already
         hf_video_url = response_data.get('url') or response_data.get('video') or response_data.get('file')
         
+        # 2. If it only returns 'file_name', target the official Hugging Face Gradio static API asset endpoint
         if not hf_video_url and 'file_name' in response_data:
             filename_clean = response_data['file_name']
             
-            # Remove any trailing structural paths to stay safe
+            # Clean up any stray legacy formatting strings if present in the data variable
             filename_clean = filename_clean.replace("file=", "").replace("file/", "")
             
-            # FORCE THE CORRECT PUBLIC DIRECT URL PATH STRING
-            hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/file/{filename_clean}"
+            # 🚀 THE PERMANENT CANONICAL GRADIO API FILE ENDPOINT PATH
+            hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/gradio_api/file={filename_clean}"
         
-        print(f"🔗 [WORKER] Direct download path target: {hf_video_url}")
+        if not hf_video_url:
+            print("❌ [WORKER] Critical Path Error: Hugging Face response did not contain a valid download locator.")
+            return False
+            
+        print(f"🔗 [WORKER] Absolute direct download URL built successfully: {hf_video_url}")
+        
     except Exception as json_err:
         print(f"❌ [WORKER] Content mismatch. Expected JSON format but engine failed to parse response payload: {str(json_err)}")
         return False
