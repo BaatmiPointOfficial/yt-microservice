@@ -93,7 +93,7 @@ def run_hf_watermark_removal(job_data):
             # Clean up any stray legacy formatting strings if present in the data variable
             filename_clean = filename_clean.replace("file=", "").replace("file/", "")
             
-            # 🚀 THE PERMANENT CANONICAL GRADIO API FILE ENDPOINT PATH
+            # 🚀 THE PERMANENT CANONICA L GRADIO API FILE ENDPOINT PATH
             hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/gradio_api/file={filename_clean}"
         
         if not hf_video_url:
