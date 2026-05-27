@@ -83,22 +83,18 @@ def run_hf_watermark_removal(job_data):
         response_data = response.json()
         print(f"📄 [WORKER] Decoded API Payload Array: {response_data}")
         
-        # 🚀 SMART LINK LOOKUP FOR YOUR SPECIFIC API OUTPUT
         hf_video_url = response_data.get('url') or response_data.get('video') or response_data.get('file')
         
-        # If the API returns 'file_name' instead of a full link, build the Hugging Face file download link dynamically!
         if not hf_video_url and 'file_name' in response_data:
             filename_clean = response_data['file_name']
             
-            # 🚀 UPDATED DIRECT ENDPOINT ROUTE TO BREAK THE 404:
+            # Remove any trailing structural paths to stay safe
+            filename_clean = filename_clean.replace("file=", "").replace("file/", "")
+            
+            # FORCE THE CORRECT PUBLIC DIRECT URL PATH STRING
             hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/file/{filename_clean}"
         
-        if not hf_video_url:
-            print("❌ [WORKER] Critical Path Error: Hugging Face response did not contain a valid URL link or file_name key.")
-            return False
-            
-        print(f"🔗 [WORKER] Successfully built streaming link path: {hf_video_url}")
-        
+        print(f"🔗 [WORKER] Direct download path target: {hf_video_url}")
     except Exception as json_err:
         print(f"❌ [WORKER] Content mismatch. Expected JSON format but engine failed to parse response payload: {str(json_err)}")
         return False
