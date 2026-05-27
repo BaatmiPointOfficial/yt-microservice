@@ -19,9 +19,7 @@ from rq import Queue
 
 # 🤖 YOUR AI TOOLS
 import yt_down  
-
 import trim_video
-
 import db
 
 # 1️⃣ LOAD SECRETS FIRST
@@ -37,9 +35,7 @@ app.add_middleware(
         "http://localhost:5173",
         "https://vaniconnect-studio.vercel.app",
         "https://clipeto.com",          
-    "https://www.clipeto.com"
-   
-        
+        "https://www.clipeto.com"
     ],
     allow_credentials=True,
     allow_methods=["*"], 
@@ -61,7 +57,6 @@ r2_secret_key = os.getenv('R2_SECRET_ACCESS_KEY')
 r2_endpoint = os.getenv('R2_ENDPOINT_URL')
 bucket_name = os.getenv('R2_BUCKET_NAME')
 
-
 s3 = boto3.client(
     's3',
     endpoint_url=r2_endpoint,
@@ -69,8 +64,9 @@ s3 = boto3.client(
     aws_secret_access_key=r2_secret_key,
     region_name='auto' 
 )
+
 # ---------------------------------------------------------
-# 🚦 REDIS QUEUE SETUP (The Ticket Rail)
+# 🚦 REDIS QUEUE SETUP (Bypassed for real-time background tasks)
 # ---------------------------------------------------------
 redis_url = os.getenv('REDIS_URL')
 if redis_url:
@@ -103,6 +99,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 
 firestore_db = firestore.client()
+
 # ---------------------------------------------------------
 # 🚀 ROUTES
 # ---------------------------------------------------------
@@ -115,7 +112,7 @@ def read_root():
 @app.post("/api/create-order")
 async def create_order(req: OrderRequest):
     try:
-        # ₹299 is 99900 paise in Razorpay
+        # ₹299 is 29900 paise in Razorpay
         order_amount = 29900  
         
         razorpay_order = rzp_client.order.create({
@@ -154,46 +151,35 @@ async def verify_payment(req: VerifyRequest):
             print(f"✅ Successfully upgraded user {req.user_id} to PRO in Firestore!")
         except Exception as e:
             print(f"🔥 FIREBASE ERROR: {e}")
-            # We just print the error to the terminal, but we don't crash the app
-            # because the Razorpay payment was actually successful!
         
         return {"status": "success", "message": "Payment verified. Pro Unlocked!"}
     
     except razorpay.errors.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Payment verification failed!")
-# 👇 (Paste the rest of your AI tool routes down here like /api/enhance, etc.) 👇
-
-
 
 @app.post("/api/download")
 @limiter.limit("5/minute")
 async def process_universal_download(
     request: Request, 
     url: str = Form(...),
-    quality: str = Form("720p"), # 🌟 Catch the user's choice!
-    user_id: str = Form(...) # 🌟 1. Added the Catching Mitt!
+    quality: str = Form("720p"), 
+    user_id: str = Form(...) 
 ):
-    # ❌ 2. Deleted the hardcoded admin_user_1!
-    
     user_data = db.get_or_create_user(user_id)
 
-    # 2. Safety Check: If Firebase returns NOTHING, stop gracefully!
     if not user_data:
         print(f"🚨 Blocked: User {user_id} not found in Firebase!")
         raise HTTPException(status_code=401, detail="User profile not found. Please log in securely.")
 
-    # 3. Use the NEW Firebase vocabulary
     is_pro = user_data.get("isProUser", False)
     credits_left = user_data.get("free_credits", 0)
 
-    # 4. The Paywall Logic
     if not is_pro and credits_left <= 0:
         print(f"🚨 Blocked: User {user_id} is out of credits!")
         raise HTTPException(status_code=402, detail="PaywallTrigger: Daily limit reached. Upgrade to Pro.")
     
     print(f"🔗 Received URL: {url} | Requested Format: {quality}")
     
-    # 🌟 Pass the quality dynamically to your engine!
     safe_filename, title, thumbnail = yt_down.download_youtube_video(video_url=url, quality=quality)
     
     if not safe_filename:
@@ -207,7 +193,6 @@ async def process_universal_download(
     except Exception as e:
         print(f"Cloudflare skipped: {e}")
 
-    # 💰 DEDUCT CREDIT (Correctly aligned with the main function!)
     if not is_pro:
         db.deduct_credit(user_id)
         print(f"💸 Credit deducted! Remaining: {credits_left - 1}")
@@ -217,9 +202,8 @@ async def process_universal_download(
         "file_name": safe_filename,
         "title": title,
         "thumbnail": thumbnail,
-        "is_audio": quality == "audio" # Let React know if it's an MP3!
+        "is_audio": quality == "audio" 
     }
-
 
 @app.post("/api/batch-split")
 @limiter.limit("5/minute")
@@ -228,35 +212,27 @@ async def process_batch_split(
     video_file: UploadFile = File(...),
     clip_duration: int = Form(60),
     user_id: str = Form(...)
-    
 ):
-  
     user_data = db.get_or_create_user(user_id)
 
-    # 2. Safety Check: If Firebase returns NOTHING, stop gracefully!
     if not user_data:
         print(f"🚨 Blocked: User {user_id} not found in Firebase!")
         raise HTTPException(status_code=401, detail="User profile not found. Please log in securely.")
 
-    # 3. Use the NEW Firebase vocabulary
     is_pro = user_data.get("isProUser", False)
     credits_left = user_data.get("free_credits", 0)
 
-    # 4. The Paywall Logic
     if not is_pro and credits_left <= 0:
         print(f"🚨 Blocked: User {user_id} is out of credits!")
-        # 402 Payment Required is the perfect status code here!
         raise HTTPException(status_code=402, detail="PaywallTrigger: Daily limit reached. Upgrade to Pro.")
     
     input_video = f"downloads/temp_batch_{video_file.filename}"
     
-    # Save the giant video
     with open(input_video, "wb") as buffer:
         buffer.write(await video_file.read())
 
     print(f"🔪 Starting Batch Split on {video_file.filename} every {clip_duration} seconds...")
     
-    # Call our new Zipping Engine
     success, zip_path = trim_video.split_video_into_parts(
         input_video, 
         clip_duration, 
@@ -266,7 +242,6 @@ async def process_batch_split(
     if not success:
         return {"error": "Failed to batch split video."}
 
-    # Clean up the massive original input video to save space
     try:
         os.remove(input_video)
     except Exception:
@@ -283,45 +258,37 @@ async def process_batch_split(
 async def process_single_clip(
     request: Request,
     video_file: UploadFile = File(...),
-    start_time: str = Form(...),   # 👈 Now Python catches the Start Time!
-    end_time: str = Form(...),     # 👈 Now Python catches the End Time!
-    text: str = Form(""),          # 👈 Catches the overlay text
+    start_time: str = Form(...),   
+    end_time: str = Form(...),     
+    text: str = Form(""),          
     user_id: str = Form(...)
 ):
-    # 1. User Auth & Paywall (Copy your standard Firebase checks here)
     user_data = db.get_or_create_user(user_id)
-    # ... your usual safety checks ...
+    if not user_data:
+        raise HTTPException(status_code=401, detail="User not found.")
 
-    # 2. Save the incoming video
     input_video = f"downloads/temp_single_{video_file.filename}"
     with open(input_video, "wb") as buffer:
         buffer.write(await video_file.read())
 
     print(f"✂️ Trimming single clip from {start_time} to {end_time}...")
     
-    # 3. Call your trimming logic from trim_video.py!
-    # (Make sure you have a function in trim_video.py that takes start/end times)
     output_filename = f"trimmed_{video_file.filename}"
     output_path = f"downloads/{output_filename}"
     
-# We use the actual function name: trim_video
-# Note: We are ignoring the 'text' variable for now because your trim_video function 
-# doesn't accept a text parameter yet!
     success = trim_video.trim_video(input_video, output_path, start_time, end_time)
 
     if not success:
         return {"error": "Failed to trim the single clip."}
 
-    # 4. Clean up original file & deduct credit
-    import os
     os.remove(input_video)
-
     return {"message": "Success!", "file_name": output_filename}
 
 @app.get("/test-db")
 def test_database():
     user_data = db.get_or_create_user("ceo@vaniconnect.com")
     return {"message": "Database is working perfectly!", "user_data": user_data}
+
 # ---------------------------------------------------------
 # 🚀 CORE PIPELINE WORKER FUNCTION (RUNS ON A NATIVE SIDE-THREAD)
 # ---------------------------------------------------------
@@ -357,7 +324,6 @@ def process_video_directly(user_id: str, r2_file_key: str, mode: str, x: int, y:
         response_data = response.json()
         print(f"📡 [PIPELINE] Hugging Face Response Payload: {response_data}")
         
-        # Extract filename using our canonical Gradio structural path fix
         filename_clean = response_data.get('file_name')
         if not filename_clean:
             print("❌ [PIPELINE] Expected file_name target pointer missing from response dictionary.")
@@ -366,8 +332,8 @@ def process_video_directly(user_id: str, r2_file_key: str, mode: str, x: int, y:
         # Clean up formatting remnants safely
         filename_clean = filename_clean.replace("file=", "").replace("file/", "")
         
-        # 🔗 BUILD GRADIO CANONICAL API ACCESS ROUTE
-        hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/gradio_api/file={filename_clean}"
+        # 🔗 BUILD GRADIO CANONICAL API ACCESS ROUTE (FIXED PATH SEPARATOR TO '/')
+        hf_video_url = f"https://vaniconnect-vaniconnect-api.hf.space/gradio_api/file/{filename_clean}"
         print(f"🔗 [PIPELINE] Verified streaming URL path resolved: {hf_video_url}")
         
     except Exception as e:
@@ -392,7 +358,6 @@ def process_video_directly(user_id: str, r2_file_key: str, mode: str, x: int, y:
 
     # 4. Upload the final clean production asset back to Cloudflare R2
     final_r2_key = f'completed/clean_{pure_filename}'
-    # Ensure R2_PUBLIC_DOMAIN env variable matches your cloud link configuration
     public_domain = os.getenv('R2_PUBLIC_DOMAIN', '').rstrip('/')
     final_public_url = f"{public_domain}/{final_r2_key}"
 
@@ -406,7 +371,6 @@ def process_video_directly(user_id: str, r2_file_key: str, mode: str, x: int, y:
 
     # 5. Instantly broadcast state to your Firebase React frontend architecture listeners
     try:
-        # Create a document identifier matching the job tracker mapping configuration
         job_ref = firestore_db.collection('users').document(user_id).collection('processed_videos').document()
         job_ref.set({
             "status": "completed",
@@ -423,7 +387,6 @@ def process_video_directly(user_id: str, r2_file_key: str, mode: str, x: int, y:
         if os.path.exists(path): 
             os.remove(path)
 
-
 # ---------------------------------------------------------
 # 🛠️ NATIVE DIRECT FASTAPI ROUTE ENDPOINT
 # ---------------------------------------------------------
@@ -431,7 +394,7 @@ def process_video_directly(user_id: str, r2_file_key: str, mode: str, x: int, y:
 @limiter.limit("5/minute")
 async def process_video_watermark(
     request: Request,
-    background_tasks: BackgroundTasks, # 🚀 Native side-thread engine loader
+    background_tasks: BackgroundTasks, 
     file: UploadFile = File(...),
     mode: str = Form(...),
     user_id: str = Form(...),
