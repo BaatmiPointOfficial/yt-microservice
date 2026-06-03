@@ -104,6 +104,7 @@ firestore_db = firestore.client()
 # 🚀 ROUTES
 # ---------------------------------------------------------
 
+@app.head("/")
 @app.get("/")
 def read_root():
     return {"message": "✅ VaniConnect AI Engine is Live and Running!"}
