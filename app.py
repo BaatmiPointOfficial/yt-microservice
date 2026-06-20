@@ -16,8 +16,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from redis import Redis
 from rq import Queue
-import uuid
-from fastapi import BackgroundTasks  # 🌟 Ensure this is added to your fastapi imports at the top!
 
 # 🤖 YOUR AI TOOLS
 import yt_down  
@@ -207,54 +205,10 @@ async def process_universal_download(
         "thumbnail": thumbnail,
         "is_audio": quality == "audio" 
     }
-import uuid
-from fastapi import BackgroundTasks  # 🌟 Ensure this is added to your fastapi imports at the top!
-
-# 🛰️ Global task tracker to store background job state
-batch_tasks = {}
-
-def background_split_task(input_video: str, clip_duration: int, user_id: str, is_pro: bool, task_id: str):
-    """ Runs the heavy video slicing and zipping in the background outside the HTTP request timeline """
-    try:
-        print(f"📦 [Task {task_id}] Processing heavy video compression matrix...")
-        success, zip_path = trim_video.split_video_into_parts(
-            input_video, 
-            clip_duration, 
-            "downloads"
-        )
-
-        if success:
-            print(f"✅ [Task {task_id}] Batch split complete! Asset archived safely.")
-            batch_tasks[task_id] = {
-                "status": "completed", 
-                "file_name": os.path.basename(zip_path)
-            }
-            # Deduct credit only after guaranteed processing success
-            if not is_pro:
-                db.deduct_credit(user_id)
-                print(f"💸 Credit deducted for user: {user_id}")
-        else:
-            print(f"❌ [Task {task_id}] Video utility processing failed.")
-            batch_tasks[task_id] = {"status": "failed", "error": "Failed to split video parts safely."}
-            
-    except Exception as e:
-        print(f"🚨 [Task {task_id}] Fatal crash in processing loop: {str(e)}")
-        batch_tasks[task_id] = {"status": "failed", "error": str(e)}
-        
-    finally:
-        # Clean up the massive input video block from disk storage
-        try:
-            if os.path.exists(input_video):
-                os.remove(input_video)
-        except Exception:
-            pass
-
-
 @app.post("/api/batch-split")
 @limiter.limit("5/minute")
 async def process_batch_split(
     request: Request,
-    background_tasks: BackgroundTasks,  # 🌟 Injected FastAPI background worker queue
     video_file: UploadFile = File(...),
     clip_duration: int = Form(60),
     user_id: str = Form(...)
@@ -274,42 +228,65 @@ async def process_batch_split(
     
     input_video = f"downloads/temp_batch_{video_file.filename}"
     
-    # Save video streaming byte buffers to storage disk
     with open(input_video, "wb") as buffer:
         buffer.write(await video_file.read())
 
-    # Generate a unique task identification hash for the frontend tracking system
-    task_id = str(uuid.uuid4())
-    batch_tasks[task_id] = {"status": "processing", "file_name": None}
+    print(f"🔪 Starting Batch Split on {video_file.filename} every {clip_duration} seconds...")
     
-    print(f"⚡ Instant Handoff: Task {task_id} generated. Routing long render loop to background worker queue.")
-    
-    # 🔥 Push task to the background processing layer and instantly release the HTTP response path
-    background_tasks.add_task(
-        background_split_task, 
+    success, zip_path = trim_video.split_video_into_parts(
         input_video, 
         clip_duration, 
-        user_id, 
-        is_pro, 
-        task_id
+        "downloads"
     )
+
+    if not success:
+        return {"error": "Failed to batch split video."}
+
+    try:
+        os.remove(input_video)
+    except Exception:
+        pass
+
+    if not is_pro:
+        db.deduct_credit(user_id)
+        print(f"💸 Credit deducted! Remaining: {credits_left - 1}")
         
-    return {
-        "message": "Accepted", 
-        "status": "processing", 
-        "task_id": task_id
-    }
+    return {"message": "Success!", "file_name": os.path.basename(zip_path)}
 
 
-@app.get("/api/batch-status/{task_id}")
-async def check_batch_status(task_id: str):
-    """ Simple polling tracker endpoint so your frontend can monitor progress safely """
-    task = batch_tasks.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Requested background batch processing task not found.")
-    return task
+@app.post("/api/trim-single")
+@limiter.limit("5/minute")
+async def process_single_clip(
+    request: Request,
+    video_file: UploadFile = File(...),
+    start_time: str = Form(...),   
+    end_time: str = Form(...),     
+    text: str = Form(""),          
+    user_id: str = Form(...)
+):
+    user_data = db.get_or_create_user(user_id)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="User not found.")
+
+    input_video = f"downloads/temp_single_{video_file.filename}"
+    with open(input_video, "wb") as buffer:
+        buffer.write(await video_file.read())
+
+    print(f"✂️ Trimming single clip from {start_time} to {end_time}...")
+    
+    output_filename = f"trimmed_{video_file.filename}"
+    output_path = f"downloads/{output_filename}"
+    
+    success = trim_video.trim_video(input_video, output_path, start_time, end_time)
+
+    if not success:
+        return {"error": "Failed to trim the single clip."}
+
+    os.remove(input_video)
+    return {"message": "Success!", "file_name": output_filename}
+
+
 @app.get("/test-db")
 def test_database():
     user_data = db.get_or_create_user("ceo@vaniconnect.com")
     return {"message": "Database is working perfectly!", "user_data": user_data}
-

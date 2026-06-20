@@ -1,8 +1,9 @@
 from moviepy.editor import VideoFileClip
 import cv2
 import os
-import zipfile  # 🌟 NEW: Needed for packing the batch clips
-import math     # 🌟 NEW: Needed to calculate how many clips to make
+import zipfile  # 🌟 Needed for packing the batch clips
+import math     # 🌟 Needed to calculate how many clips to make
+import subprocess # ⚡ NEW: Needed for instant stream-copying operations
 
 def trim_video(input_path, output_path, start_sec, end_sec):
     """ Cuts the video to the specified time range. """
@@ -82,45 +83,53 @@ def add_professional_text(input_path, output_path, text="VaniConnect AI"):
         return False
 
 # ==========================================
-# 🌟 PRO TIER FEATURE: THE BATCH SPLITTER
+# 🌟 PRO TIER FEATURE: THE BATCH SPLITTER (OPTIMIZED)
 # ==========================================
 def split_video_into_parts(video_path, clip_duration_sec, output_folder):
-    """ Slices a long video into multiple equal parts and zips them up. """
+    """ Slices a long video into multiple equal parts instantly using FFmpeg Stream Copy. """
     try:
+        # Open the file momentarily to read the metadata duration and close it immediately
         video = VideoFileClip(video_path)
         total_duration = video.duration
+        video.close() # 🛑 Freed memory immediately to stay safely under 512MB RAM
         
         # Calculate how many full clips we get
         number_of_clips = math.ceil(total_duration / clip_duration_sec)
         
         saved_files = []
         base_name = os.path.basename(video_path).rsplit('.', 1)[0]
+        
+        # Ensure the scratch directory exists safely
+        os.makedirs(output_folder, exist_ok=True)
 
         for i in range(number_of_clips):
             start_time = i * clip_duration_sec
             end_time = min((i + 1) * clip_duration_sec, total_duration)
+            duration_to_cut = end_time - start_time
             
-            # Skip tiny clips at the very end (less than 3 seconds)
-            if end_time - start_time < 3:
+            # Skip tiny tail segments (less than 3 seconds)
+            if duration_to_cut < 3:
                 continue
                 
             out_name = os.path.join(output_folder, f"{base_name}_part{i+1}.mp4")
+            print(f"✂️ Instant Slicing Part {i+1}: {start_time}s to {end_time}s")
             
-            # Slice and save with turbo settings
-            clip = video.subclip(start_time, end_time)
-            print(f"✂️ Cutting Part {i+1}: {start_time}s to {end_time}s")
+            # 🔥 THE SPEED TRANSFORMATION:
+            # We call system FFmpeg with '-c copy' to cut video blocks directly without re-rendering them.
+            cmd = [
+                'ffmpeg', '-y',
+                '-ss', str(start_time),
+                '-i', video_path,
+                '-t', str(duration_to_cut),
+                '-c', 'copy',
+                out_name
+            ]
             
-            clip.write_videofile(
-                out_name, 
-                codec="libx264", 
-                audio_codec="aac", 
-                preset="ultrafast", 
-                threads=4, 
-                logger=None
-            )
-            saved_files.append(out_name)
-        
-        video.close()
+            # Run the system tool silently backgrounded
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            if os.path.exists(out_name):
+                saved_files.append(out_name)
         
         # 📦 Zip them all up!
         zip_filename = os.path.join(output_folder, f"{base_name}_Batch.zip")
@@ -128,7 +137,7 @@ def split_video_into_parts(video_path, clip_duration_sec, output_folder):
         with zipfile.ZipFile(zip_filename, 'w') as zipf:
             for file in saved_files:
                 zipf.write(file, os.path.basename(file))
-                os.remove(file) # Delete the individual MP4s to save space
+                os.remove(file) # Delete individual tracks immediately to save disk cache spaces
                 
         return True, zip_filename
     except Exception as e:
